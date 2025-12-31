@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GEMS_Interim</string>
+    <string name="action_settings">Tetapan</string>
+    <string name="serial_port">Port Siri</string>
+
+    <string name="logout">Log Keluar</string>
+    <string name="help">Bantuan</string>
+    <string name="profile">Profil</string>
+
+    <!--Toolbar Titles-->
+    <string name="activate_vault">Aktifkan Bilik Kebal</string>
+    <string name="main_menu_title">Menu Utama</string>
+    <string name="fingerprint_enrollment">Pendaftaran Cap Jari</string>
+    <string name="system_settings">Tetapan Sistem</string>
+    <string name="vault_activation_verfication">Pengesahan Pengaktifan Bilik Kebal</string>
+
+    <!--Text for textviews-->
+    <string name="scan_left_finger">Imbas Jari Kiri</string>
+    <string name="scan_right_finger">Imbas Jari Kanan</string>
+    <string name="status_left_finger">Menunggu Cap Jari</string>
+    <string name="status_right_finger">Menunggu Cap Jari</string>
+    <string name="scan_ready_text">Sila imbas cap jari anda apabila pengimbas bertukar MERAH</string>
+    <string name="scan_your_finger">Sila Imbas Jari Anda</string>
+    <string name="name_field">Nama</string>
+    <string name="ic_number_field">Nombor IC</string>
+    <string name="staff_id_field">ID Kakitangan</string>
+    <string name="department_field">Jabatan</string>
+    <string name="awaiting_vault_confirmation">Menunggu Pengesahan Daripada Pengguna Lain</string>
+    <string name="GEMS_fullname">Grill Entrance Management System (INTERIM)</string>
+    <string name="password_field">Kata Laluan</string>
+    <string name="login_title">Log Masuk</string>
+    <string name="login_subtitle">Sila Log Masuk Ke Akaun Anda\n</string>
+    <string name="staff_id_hint">Staf ID</string>
+    <string name="password_hint">Kata Laluan\n</string>
+    <string name="default_credentials_info">Sila Hubungi Staf Sekiranya Memerlukan Pertolongan</string>
+    <string name="enter_staff_id">Masukkan Staf ID </string>
+    <string name="enter_password">Masukkan Kata Laluan</string>
+    <string name="login_successful">Log Masuk Berjaya</string>
+    <string name="invalid_credentials">Maklumat Tidak Sah</string>
+    <string name="login_error">Ralat: Log Masuk Gagal</string>
+    <string name="logout_confirmation_title">Log Keluar</string>
+    <string name="logout_confirmation_message">Anda Pasti Anda Ingin Log Keluar</string>
+    <string name="cancel">Batal</string>
+    <string name="logout_successful">Log Keluar Berjaya \n</string>
+    <string name="vault_activation_confirmed">Pengaktifan Peti Besi Disahkan</string>
+    <string name="scan_retry">Sila Imbas Sekali Lagi</string>
+    <string name="vault_activation_status">Status Pengaktifan Peti Besi\n</string>
+    <string name="vault_fingerprint_scan">Imbasan Jari Peti Besi\n</string>
+    <string name="vault_scan_instruction">Sila Imbas Jari Anda Menggunakan Mesin Pengimbas Cap Jari</string>
+    <string name="scan_fingerprint">Imbas Cap Jadi</string>
+    <string name="user_information">Maklumat Pengguna</string>
+    <string name="system_configuration">Kemaskini Sistem</string>
+    <string name="system_configuration_description">Kemaskini dan lihat informasi sistem</string>
+    <string name="quick_status">Status Ringkas</string>
+    <string name="system_online">Sistem Aktif</string>
+    <string name="scanner_ready">Pengimbas Sedia</string>
+    <string name="users_enrolled">3 Pengguna Berdaftar</string>
+    <string name="access_today">Akses Hari Ini</string>
+    <string name="system_heartbeat_desc">Pantau Kesihatan Sistem</string>
+
+
+    <!--text for buttons-->
+    <string name="confirm">Sahkan</string>
+    <string name="retry">Cuba Lagi</string>
+    <string name="login">Log Masuk</string>
+
+    <!--For test values-->
+    <string name="Name">Iffat Bin Jius</string>
+    <string name="ICNumber">001213120351</string>
+    <string name="StaffID">203914232</string>
+    <string name="Department">IT</string>
+
+    <!-- Navigation -->
+    <string name="back_button">Kembali</string>
+
+    <!-- Settings Options -->
+    <string name="network">Rangkaian</string>
+    <string name="network_desc">Kemaskini sambungan rangkaian</string>
+
+    <string name="access_log">Log Akses</string>
+    <string name="access_log_desc">Lihat sejarah akses sistem</string>
+
+    <string name="system_heartbeat">Denyutan Sistem</string>
+    <string name="heartbeat_desc">Pantau status kesihatan sistem</string>
+
+    <string name="system_info">Maklumat Sistem</string>
+    <string name="system_info_desc">Lihat maklumat peranti</string>
+
+    <!-- Language -->
+    <string name="language">Bahasa</string>
+    <string name="language_english">Bahasa Inggeris</string>
+    <string name="language_malay">Bahasa Malaysia</string>
+    <string name="manual_override">Penggantian Manual</string>
+    <string name="login_with_fingerprint">Login with Fingerprint</string>
+    <string name="fingerprint_success">Fingerprint verified successfully!</string>
+    <string name="fingerprint_error">Fingerprint verification failed. Please try again.</string>
+    <string name="fingerprint_login_title">Fingerprint Login</string>
+    <string name="fingerprint_instruction">Please place your finger on the scanner</string>
+    <string name="or">OR</string>
+</resources>

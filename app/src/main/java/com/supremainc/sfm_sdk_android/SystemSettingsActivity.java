@@ -1,0 +1,566 @@
+/*
+ * Copyright (c) 2001 - 2025. Suprema Inc. All rights reserved.
+ * Licensed under the MIT license. See LICENSE file in the project root for details.
+ */
+
+package com.supremainc.sfm_sdk_android;
+
+import android.app.AlertDialog;
+import android.os.Bundle;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.card.MaterialCardView;
+import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
+import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
+import com.supremainc.sfm_sdk_android.service.FingerprintSyncService;
+
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class SystemSettingsActivity extends AppCompatActivity {
+
+    private static final String TAG = "SystemSettings";
+
+    private ImageButton btnBack;
+    private LinearLayout resetDatabaseCard;
+    private DatabaseHelper dbHelper;
+    private SFM_SDK_ANDROID sdk;
+    private ExecutorService executor;
+    private Handler mainHandler;
+    private FingerprintSyncService syncService;
+
+    // Settings UI elements
+    private android.widget.EditText editBaseUrl;
+    private android.widget.EditText editSignalRPath;
+    private android.widget.EditText editConnectTimeout;
+    private android.widget.EditText editReadTimeout;
+    private androidx.appcompat.widget.SwitchCompat switchForceSetup;
+    private androidx.appcompat.widget.SwitchCompat switchDisableAdminVerification;
+    private androidx.appcompat.widget.SwitchCompat switchResetDatabaseFlag;
+    private android.widget.Button btnSaveSettings;
+    private android.widget.Button btnSaveAndRestart;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_system_settings);
+
+        // Initialize database helper
+        dbHelper = new DatabaseHelper(this);
+
+        // Initialize SDK and threading
+        executor = Executors.newSingleThreadExecutor();
+        mainHandler = new Handler(Looper.getMainLooper());
+        initializeSDK();
+
+        // Initialize sync service
+        syncService = new FingerprintSyncService(this, sdk);
+
+        // Initialize views
+        initializeViews();
+
+        // Set up click listeners
+        setupClickListeners();
+
+    }
+
+    /**
+     * Initialize fingerprint scanner SDK
+     */
+    private void initializeSDK() {
+        try {
+            sdk = new SFM_SDK_ANDROID();
+            Log.d(TAG, "SDK Version: " + sdk.UF_GetSDKVersion());
+            sdk.UF_InitSysParameter();
+
+            // Close existing connection
+            try {
+                sdk.UF_CloseCommPort();
+                Thread.sleep(500);
+            } catch (Exception e) {
+                Log.d(TAG, "No existing connection to close");
+            }
+
+            // Open connection
+            UF_RET_CODE ret = sdk.UF_InitCommPort("/dev/ttyACM0", 115200, false);
+            if (ret == UF_RET_CODE.UF_ERR_CANNOT_OPEN_SERIAL) {
+                ret = sdk.UF_InitCommPort("/dev/ttyACM1", 115200, false);
+            }
+
+            if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
+                Thread.sleep(300);
+                sdk.UF_Reconnect();
+                Log.d(TAG, "Scanner connected successfully");
+            } else {
+                Log.e(TAG, "Failed to connect scanner: " + ret);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing SDK", e);
+        }
+    }
+
+    private void initializeViews() {
+        btnBack = findViewById(R.id.back_button);
+        resetDatabaseCard = findViewById(R.id.reset_database_card);
+
+        // Settings input fields
+        editBaseUrl = findViewById(R.id.edit_base_url);
+        editSignalRPath = findViewById(R.id.edit_signalr_path);
+        editConnectTimeout = findViewById(R.id.edit_connect_timeout);
+        editReadTimeout = findViewById(R.id.edit_read_timeout);
+
+        // Testing flags switches
+        switchForceSetup = findViewById(R.id.switch_force_setup);
+        switchDisableAdminVerification = findViewById(R.id.switch_disable_admin_verification);
+        switchResetDatabaseFlag = findViewById(R.id.switch_reset_database_flag);
+
+        // Save buttons
+        btnSaveSettings = findViewById(R.id.btn_save_settings);
+        btnSaveAndRestart = findViewById(R.id.btn_save_and_restart);
+
+        // Load current config values into UI
+        loadConfigValues();
+    }
+
+    private void setupClickListeners() {
+        // Back button
+        btnBack.setOnClickListener(v -> {
+            onBackPressed();
+        });
+
+        // Save Settings button
+        btnSaveSettings.setOnClickListener(v -> {
+            saveConfigValues();
+        });
+
+        // Save & Restart button
+        btnSaveAndRestart.setOnClickListener(v -> {
+            saveConfigAndRestart();
+        });
+
+        // Reset Database card
+        resetDatabaseCard.setOnClickListener(v -> {
+            showResetDatabaseConfirmation();
+        });
+    }
+
+    /**
+     * Load configuration values from config.json and populate UI
+     */
+    private void loadConfigValues() {
+        try {
+            com.supremainc.sfm_sdk_android.util.AppConfig config = com.supremainc.sfm_sdk_android.util.ConfigManager.getConfig();
+
+            // Load server configuration
+            editBaseUrl.setText(config.getBaseUrl());
+            editSignalRPath.setText(config.getSignalRHubPath());
+            editConnectTimeout.setText(String.valueOf(config.getConnectTimeoutMs()));
+            editReadTimeout.setText(String.valueOf(config.getReadTimeoutMs()));
+
+            // Load testing flags
+            switchForceSetup.setChecked(config.getTestingFlags().isForceFirstTimeSetup());
+            switchDisableAdminVerification.setChecked(config.getTestingFlags().isDisableAdminVerification());
+            switchResetDatabaseFlag.setChecked(config.getTestingFlags().isResetDatabase());
+
+            Log.d(TAG, "Config values loaded successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading config values", e);
+            Toast.makeText(this, "Error loading configuration: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Save configuration values from UI to config.json
+     */
+    private void saveConfigValues() {
+        try {
+            // Get current config
+            com.supremainc.sfm_sdk_android.util.AppConfig config = com.supremainc.sfm_sdk_android.util.ConfigManager.getConfig();
+
+            // Update server configuration
+            String baseUrl = editBaseUrl.getText().toString().trim();
+            String signalRPath = editSignalRPath.getText().toString().trim();
+            String connectTimeoutStr = editConnectTimeout.getText().toString().trim();
+            String readTimeoutStr = editReadTimeout.getText().toString().trim();
+
+            // Validate inputs
+            if (baseUrl.isEmpty()) {
+                Toast.makeText(this, "Base URL cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (signalRPath.isEmpty()) {
+                Toast.makeText(this, "SignalR Hub Path cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            int connectTimeout = 10000; // default
+            int readTimeout = 10000; // default
+
+            try {
+                if (!connectTimeoutStr.isEmpty()) {
+                    connectTimeout = Integer.parseInt(connectTimeoutStr);
+                }
+                if (!readTimeoutStr.isEmpty()) {
+                    readTimeout = Integer.parseInt(readTimeoutStr);
+                }
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "Invalid timeout value. Using defaults.", Toast.LENGTH_SHORT).show();
+            }
+
+            // Update config object
+            config.setBaseUrl(baseUrl);
+            config.setSignalRHubPath(signalRPath);
+            config.setConnectTimeoutMs(connectTimeout);
+            config.setReadTimeoutMs(readTimeout);
+
+            // Update testing flags
+            config.getTestingFlags().setForceFirstTimeSetup(switchForceSetup.isChecked());
+            config.getTestingFlags().setDisableAdminVerification(switchDisableAdminVerification.isChecked());
+            config.getTestingFlags().setResetDatabase(switchResetDatabaseFlag.isChecked());
+
+            // Save to file
+            boolean saved = com.supremainc.sfm_sdk_android.util.ConfigManager.saveConfig();
+
+            if (saved) {
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ CONFIGURATION SAVED");
+                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ Base URL: " + baseUrl);
+                Log.d(TAG, "║ SignalR Path: " + signalRPath);
+                Log.d(TAG, "║ Connect Timeout: " + connectTimeout + "ms");
+                Log.d(TAG, "║ Read Timeout: " + readTimeout + "ms");
+                Log.d(TAG, "║ Force First Time Setup: " + switchForceSetup.isChecked());
+                Log.d(TAG, "║ Disable Admin Verification: " + switchDisableAdminVerification.isChecked());
+                Log.d(TAG, "║ Reset Database Flag: " + switchResetDatabaseFlag.isChecked());
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                Toast.makeText(this, "✓ Settings saved successfully!\n\nRestart app for changes to take effect.", Toast.LENGTH_LONG).show();
+            } else {
+                Log.e(TAG, "Failed to save configuration to file");
+                Toast.makeText(this, "Failed to save settings. Check logs for details.", Toast.LENGTH_LONG).show();
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error saving config values", e);
+            Toast.makeText(this, "Error saving configuration: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Save configuration values and restart the app
+     */
+    private void saveConfigAndRestart() {
+        try {
+            // Get current config
+            com.supremainc.sfm_sdk_android.util.AppConfig config = com.supremainc.sfm_sdk_android.util.ConfigManager.getConfig();
+
+            // Update server configuration
+            String baseUrl = editBaseUrl.getText().toString().trim();
+            String signalRPath = editSignalRPath.getText().toString().trim();
+            String connectTimeoutStr = editConnectTimeout.getText().toString().trim();
+            String readTimeoutStr = editReadTimeout.getText().toString().trim();
+
+            // Validate inputs
+            if (baseUrl.isEmpty()) {
+                Toast.makeText(this, "Base URL cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (signalRPath.isEmpty()) {
+                Toast.makeText(this, "SignalR Hub Path cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            int connectTimeout = 10000; // default
+            int readTimeout = 10000; // default
+
+            try {
+                if (!connectTimeoutStr.isEmpty()) {
+                    connectTimeout = Integer.parseInt(connectTimeoutStr);
+                }
+                if (!readTimeoutStr.isEmpty()) {
+                    readTimeout = Integer.parseInt(readTimeoutStr);
+                }
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "Invalid timeout value. Using defaults.", Toast.LENGTH_SHORT).show();
+            }
+
+            // Update config object
+            config.setBaseUrl(baseUrl);
+            config.setSignalRHubPath(signalRPath);
+            config.setConnectTimeoutMs(connectTimeout);
+            config.setReadTimeoutMs(readTimeout);
+
+            // Update testing flags
+            config.getTestingFlags().setForceFirstTimeSetup(switchForceSetup.isChecked());
+            config.getTestingFlags().setDisableAdminVerification(switchDisableAdminVerification.isChecked());
+            config.getTestingFlags().setResetDatabase(switchResetDatabaseFlag.isChecked());
+
+            // Save to file
+            boolean saved = com.supremainc.sfm_sdk_android.util.ConfigManager.saveConfig();
+
+            if (saved) {
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ CONFIGURATION SAVED - RESTARTING APP");
+                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ Base URL: " + baseUrl);
+                Log.d(TAG, "║ SignalR Path: " + signalRPath);
+                Log.d(TAG, "║ Connect Timeout: " + connectTimeout + "ms");
+                Log.d(TAG, "║ Read Timeout: " + readTimeout + "ms");
+                Log.d(TAG, "║ Force First Time Setup: " + switchForceSetup.isChecked());
+                Log.d(TAG, "║ Disable Admin Verification: " + switchDisableAdminVerification.isChecked());
+                Log.d(TAG, "║ Reset Database Flag: " + switchResetDatabaseFlag.isChecked());
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                Toast.makeText(this, "✓ Settings saved!\n\nRestarting app...", Toast.LENGTH_SHORT).show();
+
+                // Restart app after short delay
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    restartApp();
+                }, 1000);
+            } else {
+                Log.e(TAG, "Failed to save configuration to file");
+                Toast.makeText(this, "Failed to save settings. Check logs for details.", Toast.LENGTH_LONG).show();
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error saving config values", e);
+            Toast.makeText(this, "Error saving configuration: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Restart the application
+     */
+    private void restartApp() {
+        try {
+            android.content.Intent intent = getBaseContext().getPackageManager()
+                    .getLaunchIntentForPackage(getBaseContext().getPackageName());
+
+            if (intent != null) {
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+                startActivity(intent);
+                finish();
+
+                // Kill the current process to ensure clean restart
+                System.exit(0);
+            } else {
+                Log.e(TAG, "Failed to get launch intent");
+                Toast.makeText(this, "Failed to restart app. Please restart manually.", Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error restarting app", e);
+            Toast.makeText(this, "Error restarting app: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Show confirmation dialog before resetting database
+     */
+    private void showResetDatabaseConfirmation() {
+        new AlertDialog.Builder(this)
+                .setTitle("Reset & Sync from Server")
+                .setMessage("This will perform a full reset and sync:\n\n" +
+                        "STEP 1 - Local Reset:\n" +
+                        "✗ Clear all local database data\n" +
+                        "✗ Clear all scanner memory\n" +
+                        "✗ Delete attendance & override records\n\n" +
+                        "STEP 2 - Server Sync:\n" +
+                        "✓ Download ALL fingerprints from server\n" +
+                        "✓ Restore enrolled users to database\n" +
+                        "✓ Re-enroll fingerprints to scanner\n\n" +
+                        "⚠ Requires network connection to server\n" +
+                        "⏱ This may take 1-2 minutes\n\n" +
+                        "Are you sure you want to continue?")
+                .setPositiveButton("Reset & Sync", (dialog, which) -> {
+                    performFullReset();
+                })
+                .setNegativeButton("Cancel", null)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+
+    /**
+     * Perform full system reset - database AND scanner memory
+     */
+    private void performFullReset() {
+        Toast.makeText(this, "Resetting system... Please wait", Toast.LENGTH_SHORT).show();
+
+        // Run in background thread
+        executor.execute(() -> {
+            boolean databaseReset = false;
+            boolean scannerReset = false;
+            String errorMessage = null;
+
+            // Step 1: Reset database
+            try {
+                Log.d(TAG, "Resetting database...");
+                dbHelper.resetDatabase();
+                databaseReset = true;
+                Log.d(TAG, "✓ Database reset successful");
+            } catch (Exception e) {
+                Log.e(TAG, "✗ Database reset failed", e);
+                errorMessage = "Database reset failed: " + e.getMessage();
+            }
+
+            // Step 2: Clear scanner memory
+            if (sdk != null) {
+                try {
+                    Log.d(TAG, "Clearing scanner memory...");
+                    sdk.UF_Reconnect();
+                    Thread.sleep(200);
+
+                    UF_RET_CODE ret = sdk.UF_DeleteAll();
+
+                    if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
+                        scannerReset = true;
+                        Log.d(TAG, "✓ Scanner memory cleared successfully");
+                    } else {
+                        Log.e(TAG, "✗ Scanner memory clear failed: " + ret);
+                        errorMessage = (errorMessage != null ? errorMessage + "\n" : "") +
+                                      "Scanner clear failed: " + ret;
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "✗ Error clearing scanner memory", e);
+                    errorMessage = (errorMessage != null ? errorMessage + "\n" : "") +
+                                  "Scanner error: " + e.getMessage();
+                }
+            } else {
+                Log.w(TAG, "Scanner not initialized - skipping scanner reset");
+            }
+
+            // Step 3: Sync fingerprints from API (if reset successful)
+            final boolean finalDatabaseReset = databaseReset;
+            final boolean finalScannerReset = scannerReset;
+            final String finalErrorMessage = errorMessage;
+
+            if (databaseReset && scannerReset) {
+                // Reset successful - now sync from API
+                Log.d(TAG, "");
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ STEP 3: SYNCING FINGERPRINTS FROM API");
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                mainHandler.post(() -> {
+                    Toast.makeText(this, "✓ Reset complete!\nSyncing fingerprints from server...", Toast.LENGTH_SHORT).show();
+                });
+
+                syncService.syncFingerprintsFromAPI(new FingerprintSyncService.SyncCallback() {
+                    @Override
+                    public void onSyncStarted(int totalFingerprints) {
+                        Log.d(TAG, "Sync started: " + totalFingerprints + " fingerprints to process");
+                        mainHandler.post(() -> {
+                            Toast.makeText(SystemSettingsActivity.this,
+                                "Syncing " + totalFingerprints + " fingerprints...",
+                                Toast.LENGTH_SHORT).show();
+                        });
+                    }
+
+                    @Override
+                    public void onFingerprintEnrolled(int current, int total, String employeeName) {
+                        Log.d(TAG, "Progress: " + current + "/" + total + " - " + employeeName);
+                        // Optional: Update UI with progress if needed
+                    }
+
+                    @Override
+                    public void onSyncCompleted(int totalSynced, int totalEnrolled) {
+                        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                        Log.d(TAG, "║ RESET & SYNC COMPLETE");
+                        Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                        Log.d(TAG, "║ Database: ✓ Reset");
+                        Log.d(TAG, "║ Scanner: ✓ Cleared");
+                        Log.d(TAG, "║ Synced: " + totalSynced + " fingerprints");
+                        Log.d(TAG, "║ Enrolled: " + totalEnrolled + " to scanner");
+                        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                        mainHandler.post(() -> {
+                            String message = "✓ Reset & Sync Complete!\n\n" +
+                                           "✓ Database reset\n" +
+                                           "✓ Scanner memory cleared\n" +
+                                           "✓ Synced " + totalSynced + " fingerprint(s)\n" +
+                                           "✓ Enrolled " + totalEnrolled + " to scanner\n\n" +
+                                           "All fingerprints restored from server!";
+                            Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
+                        });
+                    }
+
+                    @Override
+                    public void onSyncError(String error) {
+                        Log.e(TAG, "✗ Sync failed after reset: " + error);
+                        mainHandler.post(() -> {
+                            String message = "⚠ Reset successful but sync failed\n\n" +
+                                           "✓ Database reset\n" +
+                                           "✓ Scanner cleared\n" +
+                                           "✗ Sync error: " + error + "\n\n" +
+                                           "Please sync manually or check network.";
+                            Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
+
+            } else {
+                // Reset failed - show error without attempting sync
+                mainHandler.post(() -> {
+                    StringBuilder message = new StringBuilder();
+
+                    if (finalDatabaseReset) {
+                        message.append("⚠ Partial reset\n\n");
+                        message.append("✓ Database reset\n");
+                        message.append("✗ Scanner reset failed\n\n");
+                        message.append("Error: ").append(finalErrorMessage);
+                    } else {
+                        message.append("✗ Reset failed\n\n");
+                        message.append(finalErrorMessage);
+                    }
+                    Toast.makeText(this, message.toString(), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        // Add any custom back navigation logic here
+        finish();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // Clean up executor
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
+        }
+
+        // IMPORTANT: DO NOT close scanner port here!
+        // Port lifecycle is managed by MainMenuActivity (the parent activity)
+        // Closing it here causes UF_ERR_CANNOT_WRITE_SERIAL when returning to MainMenu
+        if (sdk != null) {
+            try {
+                sdk.UF_Cancel(false);
+                Log.d(TAG, "Scanner operations cancelled (port kept open for MainMenu)");
+            } catch (Exception e) {
+                Log.d(TAG, "No active scanner operation to cancel");
+            }
+        }
+
+        // Close database
+        if (dbHelper != null) {
+            dbHelper.close();
+        }
+    }
+}

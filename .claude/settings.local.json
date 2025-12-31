@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(./gradlew :app:compileDebugJavaWithJavac:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(./gradlew:*)"
+    ]
+  }
+}

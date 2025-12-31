@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GEMS</string>
+    <string name="action_settings">Settings</string>
+    <string name="serial_port">Serial Port</string>
+
+    <string name="logout">Log Out</string>
+    <string name="help">Help</string>
+    <string name="profile">Profile</string>
+
+    <!--Toolbar Titles-->
+    <string name="activate_vault">Activate Vault</string>
+    <string name="main_menu_title">Main Menu</string>
+    <string name="fingerprint_enrollment">Fingerprint Enrollment</string>
+    <string name="system_settings">System Settings</string>
+    <string name="vault_activation_verfication">Vault Activation Verification</string>
+
+    <!--Text for textviews-->
+    <string name="scan_left_finger">Scan Left Finger</string>
+    <string name="scan_right_finger">Scan Right Finger</string>
+    <string name="status_left_finger">Awaiting Fingerprint</string>
+    <string name="status_right_finger">Awaiting Fingerprint</string>
+    <string name="scan_ready_text">Please scan your fingerprint when the scanner turns RED</string>
+    <string name="scan_your_finger">Please Scan Your Finger</string>
+    <string name="name_field">Name</string>
+    <string name="ic_number_field">IC Number</string>
+    <string name="staff_id_field">Staff ID</string>
+    <string name="department_field">Department</string>
+    <string name="awaiting_vault_confirmation">Awaiting Verification From Other Users</string>
+    <string name="GEMS_fullname">Grill Entrance Management System</string>
+    <string name="password_field">Password</string>
+    <string name="login_title">Log in</string>
+    <string name="login_subtitle">Please Log In to Your Account\n</string>
+    <string name="staff_id_hint">Staff ID</string>
+    <string name="password_hint">password\n</string>
+    <string name="default_credentials_info">Please contact staff if assistance are needed</string>
+    <string name="enter_staff_id">Enter Staff ID</string>
+    <string name="enter_password">Enter Password</string>
+    <string name="login_successful">Login Successful</string>
+    <string name="invalid_credentials">Invalid Credentials</string>
+    <string name="login_error">Login Error</string>
+    <string name="logout_confirmation_title">Log Out</string>
+    <string name="logout_confirmation_message">Are You Sure You Want To Log Out?</string>
+    <string name="cancel">Cancel</string>
+    <string name="logout_successful">Logout Successful\n</string>
+    <string name="vault_activation_confirmed">Vault Activation Confirmed</string>
+    <string name="scan_retry">Please Retry Scanning</string>
+    <string name="vault_activation_status">Vault Activation Status\n</string>
+    <string name="vault_fingerprint_scan">Vault Fingerprint Scan\n</string>
+    <string name="vault_scan_instruction">Please Scan Your Thumb Into The Fingerprint Scanner</string>
+    <string name="scan_fingerprint">Scan Fingerprint</string>
+    <string name="user_information">User Information</string>
+
+    <!--text for buttons-->
+    <string name="confirm">Confirm</string>
+    <string name="retry">Retry</string>
+    <string name="login">Log in</string>
+
+    <!--For test values-->
+    <string name="Name">Iffat Bin Jius</string>
+    <string name="ICNumber">001213120351</string>
+    <string name="StaffID">203914232</string>
+    <string name="Department">IT</string>
+
+    <!-- Navigation -->
+    <string name="back_button">Back</string>
+
+    <!-- Settings Options -->
+    <string name="network">Network</string>
+    <string name="network_desc">Network status and settings</string>
+
+    <string name="access_log">Access Log</string>
+    <string name="access_log_desc">View system access history</string>
+
+    <string name="system_heartbeat">System Heartbeat</string>
+    <string name="heartbeat_desc">Monitor system health status</string>
+
+    <string name="system_info">System Information</string>
+    <string name="system_info_desc">View system information</string>
+
+    <!-- Language -->
+    <string name="language">Language</string>
+    <string name="language_english">English</string>
+    <string name="language_malay">Bahasa Malaysia</string>
+    <string name="system_configuration">System Configuration</string>
+    <string name="system_configuration_description">Manage system settings and view system information</string>
+    <string name="quick_status">Quick Status</string>
+    <string name="system_online">System Online</string>
+    <string name="scanner_ready">Scanner Ready</string>
+    <string name="users_enrolled">3 Users Enrolled</string>
+    <string name="access_today">4 Accesses Today</string>
+    <string name="system_heartbeat_desc">Monitor system health</string>
+    <string name="manual_override">Manual Key Override</string>
+    <string name="fingerprint_login_title">Fingerprint Login</string>
+    <string name="fingerprint_instruction">Please place your finger on the scanner</string>
+    <string name="or">OR</string>
+    <string name="login_with_fingerprint">Login with Fingerprint</string>
+
+    <string name="fingerprint_success">Fingerprint verified successfully!</string>
+    <string name="fingerprint_error">Fingerprint verification failed. Please try again.</string>
+
+    <!-- Activity Log Filters -->
+    <string-array name="activity_log_filters">
+        <item>All Logs</item>
+        <item>Enrollment History</item>
+        <item>Override Profiles</item>
+        <item>Vault Incident History</item>
+    </string-array>
+
+</resources>

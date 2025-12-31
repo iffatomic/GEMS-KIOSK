@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.supremainc.sfm_sdk_android.MainMenuActivity">
+
+    <!-- Background image with centerCrop -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/bg_img2"
+        android:scaleType="centerCrop"
+        android:contentDescription="Background" />
+
+    <!-- Background overlay -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/cardview_shadow_start_color"
+        android:alpha="1" />
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:layout_alignParentTop="true">
+
+        <Button
+            android:id="@+id/btn_info"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="@drawable/container_background"
+            android:backgroundTint="@color/buttonBackground"
+            android:text="@string/profile"
+            android:textColor="@color/buttonText"
+            android:textSize="14sp"
+            android:paddingHorizontal="16dp"
+            android:visibility="gone"/>
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_weight="1"
+            android:text="@string/main_menu_title"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:gravity="center"
+            android:layout_marginHorizontal="16dp" />
+
+        <LinearLayout
+            android:id="@+id/language_container"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/container_background"
+            android:backgroundTint="@color/buttonBackground"
+            android:visibility="gone"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_language"
+                android:gravity="center"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Language" />
+
+            <Spinner
+                android:id="@+id/language_spinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="100dp"
+                android:popupBackground="@color/white" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Main content ScrollView -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/toolbar"
+        android:layout_marginTop="8dp"
+        android:fillViewport="true"
+        android:padding="10dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <!-- Logo and Security Text Container -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="15dp"
+                android:layout_marginBottom="20dp"
+                android:elevation="2dp">
+
+                <ImageView
+                    android:id="@+id/imgLogo"
+                    android:layout_width="150dp"
+                    android:layout_height="150dp"
+                    android:layout_marginBottom="0dp"
+                    android:contentDescription="App Logo"
+                    android:src="@drawable/bnm_logo_official" />
+
+                <TextView
+                    android:id="@+id/tvSecurityText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/GEMS_fullname"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="18sp"
+                    android:textStyle="italic"
+                    android:gravity="center"
+                    android:textAlignment="center" />
+
+            </LinearLayout>
+
+
+            <!-- Menu Buttons Container -->
+            <LinearLayout
+                android:id="@+id/rightContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/container_background"
+                android:padding="20dp"
+                android:elevation="2dp"
+                android:layout_marginBottom="20dp">
+
+                <Button
+                    android:id="@+id/btn_manual_override"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/manual_override"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_fingerprint_enrollment"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/fingerprint_enrollment"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone"
+                    android:elevation="1dp"
+                    android:drawableStart="@drawable/fingerprint_icon"
+                    android:drawablePadding="12dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_delete_user"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Delete Enrolled User"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone"
+                    android:elevation="1dp"
+                    android:drawableStart="@android:drawable/ic_menu_delete"
+                    android:drawablePadding="12dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_main_vault_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Vault Override Status"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="visible"
+                    android:elevation="1dp"
+                    android:drawableStart="@drawable/fingerprint_icon"
+                    android:drawablePadding="12dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/DayVaultStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Day Vault Status"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone"
+                    android:elevation="1dp"
+                    android:drawableStart="@drawable/fingerprint_icon"
+                    android:drawablePadding="12dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_activity_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Activity Log"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="visible"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_activate_vault"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/activate_vault"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:visibility="gone"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_system_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/system_settings"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:visibility="gone"
+                    android:paddingStart="20dp" />
+
+                <Button
+                    android:id="@+id/btn_log_out"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/logout"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:elevation="1dp"
+                    android:visibility="visible"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+            </LinearLayout>
+
+            <!-- Manual Override Dashboard -->
+            <LinearLayout
+                android:id="@+id/overrideDashboardContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/container_background"
+                android:padding="20dp"
+                android:elevation="2dp"
+                android:visibility="gone"
+                android:layout_marginBottom="20dp">
+
+                <!-- Dashboard Header -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="16dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🔓 Manual Override Dashboard"
+                        android:textColor="@color/colorAccent"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btnViewMoreOverrides"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:text="View All"
+                        android:textSize="12sp"
+                        android:textColor="@color/colorPrimary"
+                        android:background="@android:color/transparent"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:layout_marginStart="8dp"
+                        android:visibility="gone"
+                        style="?android:attr/borderlessButtonStyle" />
+
+                    <TextView
+                        android:id="@+id/overrideCountBadge"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/container_background"
+                        android:backgroundTint="@android:color/holo_red_dark"
+                        android:gravity="center"
+                        android:text="0"
+                        android:textColor="@color/buttonText"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Status Message when no overrides -->
+                <LinearLayout
+                    android:id="@+id/noOverridesMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="24dp"
+                    android:background="#40FFFFFF">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="✓"
+                        android:textSize="48sp"
+                        android:textColor="@android:color/holo_green_light"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="All Vaults Secure"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No manual overrides currently active"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <!-- Container for vault override cards (dynamically populated) -->
+                <LinearLayout
+                    android:id="@+id/overrideCardsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+
+
+</RelativeLayout>

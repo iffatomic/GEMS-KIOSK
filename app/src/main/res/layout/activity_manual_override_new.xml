@@ -1,0 +1,737 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_img2"
+    android:fillViewport="true">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="24dp">
+
+        <!-- Toolbar with back button and title -->
+        <LinearLayout
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <ImageButton
+                android:id="@+id/back_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back"
+                android:padding="12dp"
+                android:src="@drawable/back_button"
+                app:tint="@color/white" />
+
+            <TextView
+                android:id="@+id/toolbar_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_weight="1"
+                android:text="Manual Key Override"
+                android:textColor="@color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Main Content Container -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/toolbar"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical">
+
+            <!-- Step Indicator -->
+            <LinearLayout
+                android:id="@+id/stepIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/stepNumber"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/circle_background"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/white"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/stepDescription"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:text="Select Vault"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- STEP 1: Vault Type Selection -->
+            <LinearLayout
+                android:id="@+id/step1Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Step 1: Select Vault"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Choose which vault you want to override"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+                <!-- Dynamic Vault Button Container -->
+                <LinearLayout
+                    android:id="@+id/vaultButtonContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Main Vault Button (kept for backwards compatibility) -->
+                    <Button
+                        android:id="@+id/btnMainVault"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="16dp"
+                        android:text="Main Vault"
+                        android:textColor="@color/buttonText"
+                        android:backgroundTint="@color/buttonBackground"
+                        android:background="@drawable/container_background"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:elevation="1dp"
+                        android:drawableStart="@drawable/ic_vault"
+                        android:drawablePadding="12dp"
+                        android:drawableTint="@color/buttonText"
+                        android:gravity="center_vertical|start"
+                        android:paddingStart="20dp"
+                        android:visibility="gone" />
+
+                    <!-- Day Vault Button (kept for backwards compatibility) -->
+                    <Button
+                        android:id="@+id/btnDayVault"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:text="Day Vault"
+                        android:textColor="@color/buttonText"
+                        android:backgroundTint="@color/buttonBackground"
+                        android:background="@drawable/container_background"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:elevation="1dp"
+                        android:drawableStart="@drawable/ic_vault"
+                        android:drawablePadding="12dp"
+                        android:drawableTint="@color/buttonText"
+                        android:gravity="center_vertical|start"
+                        android:paddingStart="20dp"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- STEP 2: Entry Point Selection -->
+            <LinearLayout
+                android:id="@+id/step2Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Step 2: Select Entry Point"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvSelectedVault"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Main Vault"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+                <!-- Main Grill Button -->
+                <Button
+                    android:id="@+id/btnMainGrill"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Main Grill"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <!-- Compartment 1 Button -->
+                <Button
+                    android:id="@+id/btnCompartment1"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Compartment 1"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <!-- Compartment 2 Button -->
+                <Button
+                    android:id="@+id/btnCompartment2"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Compartment 2"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <!-- Compartment 3 Button -->
+                <Button
+                    android:id="@+id/btnCompartment3"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="16dp"
+                    android:text="Compartment 3"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:elevation="1dp"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="20dp" />
+
+                <!-- Back Button -->
+                <Button
+                    android:id="@+id/btnBackToStep1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="@color/textSecondary"
+                    android:text="Back"
+                    android:textColor="@color/white" />
+
+            </LinearLayout>
+
+            <!-- STEP 3: Time Frame Selection (NEW for GEMS Original) -->
+            <LinearLayout
+                android:id="@+id/step3Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Step 2: Set Time Frame"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <!-- Selected Vault Display -->
+                <TextView
+                    android:id="@+id/tvTimeFrameVaultDisplay"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Main Vault Door A"
+                    android:textAlignment="center"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <!-- Start Time (Auto - Now) -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="Start Time:"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvStartTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Now"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="18sp"
+                    android:background="#40FFFFFF"
+                    android:padding="16dp" />
+
+                <!-- End Date & Time Selection -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="End Time (Max 7 days):"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnSelectEndTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:text="Select End Date &amp; Time"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/colorAccent"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/tvSelectedEndTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Not selected"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="16sp"
+                    android:background="#40FFFFFF"
+                    android:padding="16dp" />
+
+                <!-- Info Message -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Override will auto-deactivate at the end time or can be manually deactivated, whichever is earlier."
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="2dp" />
+
+                <!-- Action Buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnBackToStep2"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="@color/textSecondary"
+                        android:text="Back"
+                        android:textColor="@color/white" />
+
+                    <Button
+                        android:id="@+id/btnProceedToVerification"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="@color/colorAccent"
+                        android:text="Create Override"
+                        android:textColor="@color/white"
+                        android:enabled="false" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- STEP 4: Key Switch Monitoring (NEW) -->
+            <LinearLayout
+                android:id="@+id/step4Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Step 3: Turn Key Switches"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKeySwitchVaultName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Main Vault Door A"
+                    android:textAlignment="center"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKeySwitchInstructions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Please turn all 3 key switches to activate manual override"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+                <!-- Key Switch 1 Status -->
+                <LinearLayout
+                    android:id="@+id/keySwitch1Container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="#40FF0000"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/circle_background"
+                        android:gravity="center"
+                        android:text="1"
+                        android:textColor="@color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Key Switch 1"
+                            android:textColor="@color/textPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvKeySwitch1Status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="OFF - Waiting..."
+                            android:textColor="@color/textSecondary"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/ivKeySwitch1Icon"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:alpha="0.3"
+                        android:src="@android:drawable/ic_lock_idle_lock"
+                        app:tint="@android:color/holo_red_dark" />
+
+                </LinearLayout>
+
+                <!-- Key Switch 2 Status -->
+                <LinearLayout
+                    android:id="@+id/keySwitch2Container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="#40FF0000"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/circle_background"
+                        android:gravity="center"
+                        android:text="2"
+                        android:textColor="@color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Key Switch 2"
+                            android:textColor="@color/textPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvKeySwitch2Status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="OFF - Waiting..."
+                            android:textColor="@color/textSecondary"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/ivKeySwitch2Icon"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:alpha="0.3"
+                        android:src="@android:drawable/ic_lock_idle_lock"
+                        app:tint="@android:color/holo_red_dark" />
+
+                </LinearLayout>
+
+                <!-- Key Switch 3 Status -->
+                <LinearLayout
+                    android:id="@+id/keySwitch3Container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:background="#40FF0000"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/circle_background"
+                        android:gravity="center"
+                        android:text="3"
+                        android:textColor="@color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Key Switch 3"
+                            android:textColor="@color/textPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvKeySwitch3Status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="OFF - Waiting..."
+                            android:textColor="@color/textSecondary"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/ivKeySwitch3Icon"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:alpha="0.3"
+                        android:src="@android:drawable/ic_lock_idle_lock"
+                        app:tint="@android:color/holo_red_dark" />
+
+                </LinearLayout>
+
+                <!-- Waiting Message -->
+                <TextView
+                    android:id="@+id/tvKeySwitchWaitingMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="Waiting for key switches to be turned..."
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp"
+                    android:textStyle="italic" />
+
+                <!-- Progress Bar -->
+                <ProgressBar
+                    android:id="@+id/keySwitchProgress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone" />
+
+                <!-- Cancel Button -->
+                <Button
+                    android:id="@+id/btnCancelKeySwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="@color/textSecondary"
+                    android:text="Cancel"
+                    android:textColor="@color/white" />
+
+            </LinearLayout>
+
+            <!-- STEP 5: Result Screen -->
+            <LinearLayout
+                android:id="@+id/step5Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/ivResultIcon"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:layout_marginBottom="24dp"
+                    android:src="@drawable/ic_check_circle"
+                    app:tint="@color/holo_green_dark" />
+
+                <TextView
+                    android:id="@+id/tvResultTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Override Activated!"
+                    android:textAlignment="center"
+                    android:textColor="@color/holo_green_dark"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvResultDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Main Vault - Compartment 1\nis now overridden"
+                    android:textAlignment="center"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/tvOverrideDetails"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Activated via:\n✓ Key Switch 1\n✓ Key Switch 2\n✓ Key Switch 3"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/btnDone"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:backgroundTint="@color/colorPrimary"
+                    android:text="Done"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- Security Notice -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="#40FF0000"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Security Notice"
+                    android:textColor="@android:color/holo_red_light"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="2dp"
+                    android:text="All manual override activations are logged. All 3 physical key switches must be turned to activate an override."
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </RelativeLayout>
+</ScrollView>

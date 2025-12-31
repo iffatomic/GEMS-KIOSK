@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2001 - 2019. Suprema Inc. All rights reserved.
+  ~ Licensed under the MIT license. See LICENSE file in the project root for details.
+  -->
+
+<resources>
+    <!-- Dark Theme with Blue accents -->
+    <color name="colorPrimary">#1E88E5</color>          <!-- Dark Blue -->
+    <color name="colorPrimaryDark">#1565C0</color>      <!-- Darker Blue -->
+    <color name="colorAccent">#FFC107</color>
+
+    <!-- Background and surface -->
+    <color name="colorBackground">#2F2F2F</color>       <!-- Dark Gray Background -->
+    <color name="colorSurface">#3C3C3C</color>          <!-- Slightly lighter gray -->
+    <color name="colorBoxBackground">#0066CC</color>          <!-- Slightly lighter blue -->
+
+
+    <!-- Text colors -->
+    <color name="textPrimary">#FFFFFF</color>           <!-- White text -->
+    <color name="textSecondary">#B0BEC5</color>         <!-- Light gray text -->
+    <color name="CustomEditTextStyle">#FF0000</color> <!--Test color-->
+
+    <!-- Buttons -->
+    <color name="buttonBackground">#1E88E5</color>      <!-- Blue for buttons -->
+    <color name="buttonText">#FFFFFF</color>            <!-- White text on buttons -->
+
+    <!-- Icons -->
+    <color name="iconTint">#1E88E5</color>               <!-- Blue tint for icons -->
+
+    <color name="primary">#6200EE</color>
+    <color name="white">#FFFFFF</color>
+    <color name="white_translucent">#B3FFFFFF</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="divider">#E0E0E0</color>
+    <color name="stroke_color">#E0E0E0</color>
+    <color name="icon_tint">#757575</color>
+
+    <!-- Primary Colors -->
+    <color name="primary2">#2196F3</color>
+    <color name="primary_dark">#1976D2</color>
+    <color name="primary_light">#BBDEFB</color>
+    <color name="accent">#FF5722</color>
+
+    <!-- Background Colors -->
+    <color name="background_primary">#F5F5F5</color>
+    <color name="card_background">#FFFFFF</color>
+
+
+    <!-- Icon Colors -->
+    <color name="icon_tint2">#2196F3</color>
+
+    <!-- System Colors -->
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="holo_green_dark">#669900</color>
+    <color name="holo_orange_dark">#FF8C00</color>
+</resources>

@@ -1,0 +1,36 @@
+{
+  "baseUrl": "http://192.2.2.100:7000",
+  "connectTimeoutMs": 10000,
+  "readTimeoutMs": 10000,
+  "signalRHubPath": "http://192.2.2.100:7000/eventHub",
+  "testingFlags": {
+    "forceFirstTimeSetup": false,
+    "disableAdminVerification": false,
+    "resetDatabase": false
+  },
+  "endpoints": {
+    "userRegistration": "/api/UserRegistration/register",
+    "checkUsername": "/api/UserRegistration/check-username/",
+    "checkEmployee": "/api/UserRegistration/check-employee-number/",
+    "manualOverride": "/api/ManualOverride/profiles",
+    "deactivateOverride": "/api/ManualOverride/deactivate/",
+    "allProfiles": "/api/ManualOverride/all-profiles",
+    "validProfile": "/api/ManualOverride/valid-profile"
+  },
+  "doorVariables": {
+    "DOOR_A": "MAIN.SOFT_LOCK_A",
+    "DOOR_B": "MAIN.SOFT_LOCK_B",
+    "DOOR_C": "MAIN.SOFT_LOCK_C",
+    "DOOR_D": "MAIN.SOFT_LOCK_D",
+    "DOOR_E": "MAIN.SOFT_LOCK_E",
+    "DOOR_F": "MAIN.SOFT_LOCK_F",
+    "DOOR_G": "MAIN.SOFT_LOCK_G"
+  },
+  "signalREvents": {
+    "keySwitchChanged": "KeySwitchChanged",
+    "keySwitchAggregate": "KeySwitchAggregate",
+    "manualOverride": "ManualOverrideEvent",
+    "doorStateChanged": "DoorStateChanged",
+    "vaultIncident": "VaultIncidentOccurred"
+  }
+}

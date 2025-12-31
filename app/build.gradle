@@ -1,0 +1,49 @@
+/*
+ * Copyright (c) 2001 - 2019. Suprema Inc. All rights reserved.
+ * Licensed under the MIT license. See LICENSE file in the project root for details.
+ */
+apply plugin: 'com.android.application'
+android {
+    compileSdkVersion 35  // ← CHANGED: Increased to satisfy dependency requirements
+    defaultConfig {
+        applicationId "com.banknegaramalaysia.gems"
+        minSdkVersion 21
+        targetSdkVersion 35  // ← KEPT AT 30: Avoids PendingIntent FLAG_IMMUTABLE requirement
+        versionCode 1
+        versionName "1.0.0"
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    buildTypes {
+        release {
+            minifyEnabled true  // ← Enable code obfuscation for security
+            shrinkResources true  // ← Remove unused resources
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8  //included for jitpack
+        targetCompatibility JavaVersion.VERSION_1_8  //included for jitpack
+    }
+    namespace 'com.supremainc.sfm_sdk_android'
+}
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.activity:activity:1.10.1'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    implementation project(path: ':sfm_sdk')
+    implementation 'com.airbnb.android:lottie:6.3.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.compose.ui:ui-text-google-fonts:1.8.3'
+
+    // SignalR for Android
+    implementation 'com.microsoft.signalr:signalr:8.0.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'io.reactivex.rxjava3:rxjava:3.1.8'
+    implementation 'io.reactivex.rxjava3:rxandroid:3.0.2'
+}
