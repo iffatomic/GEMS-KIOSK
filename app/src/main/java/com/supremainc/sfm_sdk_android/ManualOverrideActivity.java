@@ -187,6 +187,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
             @Override public void onVaultIncident(SignalRService.VaultIncidentData incident) {}
             @Override public void onVaultIncidentBroadcast(com.supremainc.sfm_sdk_android.dto.signalr.VaultIncidentBroadcastDto incident) {}
             @Override public void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event) {}
+            @Override public void onFingerprintEnrollmentCompleted(com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto event) {}
             @Override public void onConnectionClosed() {
                 runOnUiThread(() -> {
                     signalRConnected = false;

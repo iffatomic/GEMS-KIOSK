@@ -11,6 +11,7 @@ import android.util.Log;
 import com.microsoft.signalr.HubConnection;
 import com.microsoft.signalr.HubConnectionBuilder;
 import com.microsoft.signalr.HubConnectionState;
+import com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto;
 import com.supremainc.sfm_sdk_android.dto.signalr.KeySwitchAggregateEventDto;
 import com.supremainc.sfm_sdk_android.dto.signalr.KeySwitchEventDto;
 import com.supremainc.sfm_sdk_android.dto.signalr.VaultIncidentBroadcastDto;
@@ -149,6 +150,21 @@ public class SignalRService {
                 eventListener.onInterimCutoffReached(event);
             }
         }, com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto.class);
+
+        // ========== Listen for Fingerprint Enrollment Completion ==========
+        hubConnection.on("FingerprintEnrollmentCompleted", (event) -> {
+            Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+            Log.d(TAG, "║ FINGERPRINT ENROLLMENT COMPLETED");
+            Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+            Log.d(TAG, "║ Employee: " + event.getFullName() + " (" + event.getStaffID() + ")");
+            Log.d(TAG, "║ Fingerprints: " + event.getFingerprintCount());
+            Log.d(TAG, "║ Message: " + event.getMessage());
+            Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+            if (eventListener != null) {
+                eventListener.onFingerprintEnrollmentCompleted(event);
+            }
+        }, FingerprintEnrollmentEventDto.class);
 
         // Connection lifecycle callbacks
         hubConnection.onClosed(error -> {
@@ -359,6 +375,7 @@ public class SignalRService {
         void onKeySwitchChanged(KeySwitchEventDto event);
         void onKeySwitchAggregate(KeySwitchAggregateEventDto event);
         void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event);
+        void onFingerprintEnrollmentCompleted(FingerprintEnrollmentEventDto event);  // NEW: Fingerprint enrollment trigger
         void onConnectionClosed();
     }
 

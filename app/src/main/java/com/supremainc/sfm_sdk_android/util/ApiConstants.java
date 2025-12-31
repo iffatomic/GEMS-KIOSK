@@ -44,6 +44,9 @@ public class ApiConstants {
     public static final String ENDPOINT_STAFF_GET_FINGERPRINTS = "/api/StaffEnrollment/fingerprints/";
     public static final String ENDPOINT_STAFF_GET_ALL_FINGERPRINTS = "/api/StaffEnrollment/fingerprints";
 
+    // Endpoints - Fingerprint Download (NEW - optimized endpoint for kiosk fingerprint sync)
+    public static final String ENDPOINT_FINGERPRINT_DOWNLOAD = "/api/FingerprintDownload/employee-fingerprints";
+
     // Endpoints - Manual Override
     public static final String ENDPOINT_MANUAL_OVERRIDE = "/api/ManualOverride/profiles";
     public static final String ENDPOINT_DEACTIVATE_OVERRIDE = "/api/ManualOverride/deactivate/";

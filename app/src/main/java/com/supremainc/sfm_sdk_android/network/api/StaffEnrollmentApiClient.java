@@ -368,18 +368,18 @@ public class StaffEnrollmentApiClient {
 
     /**
      * Get all fingerprint credentials from all users
-     * GET /api/StaffEnrollment/fingerprints
-     * Returns all users with their associated fingerprints including their IDs
+     * GET /api/FingerprintDownload/employee-fingerprints (NEW optimized endpoint)
+     * Returns all employees with their associated fingerprints including their IDs
      * @param callback Response callback
      */
     public void getAllFingerprints(ApiCallback<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse>> callback) {
         Log.d(TAG, "╔═══════════════════════════════════════════");
-        Log.d(TAG, "║ GET ALL FINGERPRINTS REQUEST");
+        Log.d(TAG, "║ GET ALL FINGERPRINTS REQUEST (NEW ENDPOINT)");
         Log.d(TAG, "╚═══════════════════════════════════════════");
 
         Type responseType = new TypeToken<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse>>(){}.getType();
         baseClient.get(
-                ApiConstants.ENDPOINT_STAFF_GET_ALL_FINGERPRINTS,
+                ApiConstants.ENDPOINT_FINGERPRINT_DOWNLOAD,
                 null,
                 responseType,
                 new ApiCallback<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse>>() {

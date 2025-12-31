@@ -64,9 +64,17 @@
             android:exported="true"></activity>
         <activity
             android:name=".MainActivity"
-            android:exported="true" /> <!-- Fixed USB service declaration -->
+            android:exported="true" />
+
+        <!-- USB service for fingerprint scanner hardware -->
         <service
             android:name="com.supremainc.sfm_sdk.UsbService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Auto-sync service for fingerprint enrollment SignalR events -->
+        <service
+            android:name=".service.FingerprintAutoSyncService"
             android:enabled="true"
             android:exported="false" />
     </application>
