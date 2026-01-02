@@ -15,7 +15,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.card.MaterialCardView;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
+import com.supremainc.sfm_sdk.enumeration.UF_ENROLL_OPTION;
 import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
+import com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse;
+import com.supremainc.sfm_sdk_android.network.api.FingerprintDownloadApiClient;
+import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.service.FingerprintSyncService;
 
 import android.os.Handler;
@@ -29,12 +33,13 @@ public class SystemSettingsActivity extends AppCompatActivity {
     private static final String TAG = "SystemSettings";
 
     private ImageButton btnBack;
-    private LinearLayout resetDatabaseCard;
+    private LinearLayout syncFingerprintsCard;
     private DatabaseHelper dbHelper;
     private SFM_SDK_ANDROID sdk;
     private ExecutorService executor;
     private Handler mainHandler;
     private FingerprintSyncService syncService;
+    private FingerprintDownloadApiClient fingerprintDownloadApiClient;
 
     // Settings UI elements
     private android.widget.EditText editBaseUrl;
@@ -63,6 +68,9 @@ public class SystemSettingsActivity extends AppCompatActivity {
         // Initialize sync service
         syncService = new FingerprintSyncService(this, sdk);
 
+        // Initialize fingerprint download API client
+        fingerprintDownloadApiClient = new FingerprintDownloadApiClient(this);
+
         // Initialize views
         initializeViews();
 
@@ -73,6 +81,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
 
     /**
      * Initialize fingerprint scanner SDK
+     * Same approach as Interim project - close and reopen port
      */
     private void initializeSDK() {
         try {
@@ -109,7 +118,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
 
     private void initializeViews() {
         btnBack = findViewById(R.id.back_button);
-        resetDatabaseCard = findViewById(R.id.reset_database_card);
+        syncFingerprintsCard = findViewById(R.id.sync_fingerprints_card);
 
         // Settings input fields
         editBaseUrl = findViewById(R.id.edit_base_url);
@@ -146,9 +155,9 @@ public class SystemSettingsActivity extends AppCompatActivity {
             saveConfigAndRestart();
         });
 
-        // Reset Database card
-        resetDatabaseCard.setOnClickListener(v -> {
-            showResetDatabaseConfirmation();
+        // Sync Fingerprints card
+        syncFingerprintsCard.setOnClickListener(v -> {
+            showSyncFingerprintsConfirmation();
         });
     }
 
@@ -367,25 +376,22 @@ public class SystemSettingsActivity extends AppCompatActivity {
     }
 
     /**
-     * Show confirmation dialog before resetting database
+     * Show confirmation dialog before syncing fingerprints
      */
-    private void showResetDatabaseConfirmation() {
+    private void showSyncFingerprintsConfirmation() {
         new AlertDialog.Builder(this)
-                .setTitle("Reset & Sync from Server")
-                .setMessage("This will perform a full reset and sync:\n\n" +
-                        "STEP 1 - Local Reset:\n" +
-                        "✗ Clear all local database data\n" +
-                        "✗ Clear all scanner memory\n" +
-                        "✗ Delete attendance & override records\n\n" +
-                        "STEP 2 - Server Sync:\n" +
+                .setTitle("Reset & Sync Fingerprints from Server")
+                .setMessage("This will RESET and sync fingerprints:\n\n" +
+                        "⚠️ CLEAR all existing fingerprints from scanner\n" +
+                        "⚠️ CLEAR all fingerprint data from database\n" +
                         "✓ Download ALL fingerprints from server\n" +
-                        "✓ Restore enrolled users to database\n" +
-                        "✓ Re-enroll fingerprints to scanner\n\n" +
-                        "⚠ Requires network connection to server\n" +
+                        "✓ Save to local database\n" +
+                        "✓ Enroll to scanner\n\n" +
+                        "⚠️ This action cannot be undone!\n" +
                         "⏱ This may take 1-2 minutes\n\n" +
                         "Are you sure you want to continue?")
                 .setPositiveButton("Reset & Sync", (dialog, which) -> {
-                    performFullReset();
+                    performResetAndSync();
                 })
                 .setNegativeButton("Cancel", null)
                 .setIcon(android.R.drawable.ic_dialog_alert)
@@ -393,138 +399,311 @@ public class SystemSettingsActivity extends AppCompatActivity {
     }
 
     /**
-     * Perform full system reset - database AND scanner memory
+     * Reset scanner and database, then sync from server
+     * Same approach as Interim project - clear everything first, then fresh sync
      */
-    private void performFullReset() {
-        Toast.makeText(this, "Resetting system... Please wait", Toast.LENGTH_SHORT).show();
+    private void performResetAndSync() {
+        Toast.makeText(this, "Resetting scanner and database...", Toast.LENGTH_SHORT).show();
 
-        // Run in background thread
+        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.d(TAG, "║ RESET & SYNC INITIATED");
+        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
         executor.execute(() -> {
-            boolean databaseReset = false;
-            boolean scannerReset = false;
-            String errorMessage = null;
-
-            // Step 1: Reset database
             try {
-                Log.d(TAG, "Resetting database...");
-                dbHelper.resetDatabase();
-                databaseReset = true;
-                Log.d(TAG, "✓ Database reset successful");
-            } catch (Exception e) {
-                Log.e(TAG, "✗ Database reset failed", e);
-                errorMessage = "Database reset failed: " + e.getMessage();
-            }
+                // STEP 1: Clear scanner memory
+                Log.d(TAG, "Step 1: Clearing scanner memory...");
+                sdk.UF_Reconnect();
+                Thread.sleep(200);
 
-            // Step 2: Clear scanner memory
-            if (sdk != null) {
-                try {
-                    Log.d(TAG, "Clearing scanner memory...");
-                    sdk.UF_Reconnect();
-                    Thread.sleep(200);
+                UF_RET_CODE clearRet = sdk.UF_DeleteAll();
+                Log.d(TAG, "Scanner clear result: " + clearRet);
 
-                    UF_RET_CODE ret = sdk.UF_DeleteAll();
-
-                    if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
-                        scannerReset = true;
-                        Log.d(TAG, "✓ Scanner memory cleared successfully");
-                    } else {
-                        Log.e(TAG, "✗ Scanner memory clear failed: " + ret);
-                        errorMessage = (errorMessage != null ? errorMessage + "\n" : "") +
-                                      "Scanner clear failed: " + ret;
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "✗ Error clearing scanner memory", e);
-                    errorMessage = (errorMessage != null ? errorMessage + "\n" : "") +
-                                  "Scanner error: " + e.getMessage();
+                if (clearRet == UF_RET_CODE.UF_RET_SUCCESS) {
+                    Log.d(TAG, "✓ Scanner memory cleared successfully");
+                } else {
+                    Log.e(TAG, "⚠ Scanner clear failed: " + clearRet + " (continuing anyway)");
                 }
-            } else {
-                Log.w(TAG, "Scanner not initialized - skipping scanner reset");
+
+                // STEP 2: Clear database synced_fingerprints table
+                Log.d(TAG, "Step 2: Clearing database synced_fingerprints table...");
+                int deletedCount = dbHelper.clearAllSyncedFingerprints();
+                Log.d(TAG, "✓ Database cleared: " + deletedCount + " records deleted");
+
+                mainHandler.post(() -> {
+                    Toast.makeText(SystemSettingsActivity.this,
+                        "Reset complete! Starting sync...",
+                        Toast.LENGTH_SHORT).show();
+                });
+
+                // STEP 3: Now perform fresh sync
+                Log.d(TAG, "Step 3: Starting fresh sync from server...");
+                mainHandler.post(() -> {
+                    performFingerprintSync();
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error during reset", e);
+                mainHandler.post(() -> {
+                    Toast.makeText(SystemSettingsActivity.this,
+                        "Reset failed: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    /**
+     * Perform fingerprint sync from server using NEW endpoint
+     * Uses /api/FingerprintDownload/employee-fingerprints (optimized endpoint)
+     * Performs incremental sync - only adds NEW fingerprints, preserves existing data
+     */
+    private void performFingerprintSync() {
+        Toast.makeText(this, "Starting fingerprint sync... Please wait", Toast.LENGTH_SHORT).show();
+
+        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.d(TAG, "║ MANUAL FINGERPRINT SYNC INITIATED");
+        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+        // STEP 1: Download all fingerprints from NEW optimized endpoint
+        Log.d(TAG, "Calling FingerprintDownload endpoint to get all employee fingerprints...");
+
+        fingerprintDownloadApiClient.getAllEmployeesWithFingerprints(
+                new ApiCallback<AllEmployeesFingerprintsResponse>() {
+            @Override
+            public void onSuccess(AllEmployeesFingerprintsResponse response) {
+                Log.i(TAG, "✓ Successfully fetched fingerprint data from server");
+                Log.d(TAG, "  → Total Employees: " + response.getTotalEmployees());
+                Log.d(TAG, "  → Total Fingerprints: " + response.getTotalFingerprints());
+
+                mainHandler.post(() -> {
+                    Toast.makeText(SystemSettingsActivity.this,
+                        "Downloaded " + response.getTotalFingerprints() + " fingerprints. Syncing to scanner...",
+                        Toast.LENGTH_SHORT).show();
+                });
+
+                // STEP 2: Enroll fingerprints directly from downloaded data
+                // (Don't use syncService - it calls the OLD interim endpoint)
+                Log.d(TAG, "Enrolling fingerprints from downloaded data...");
+
+                enrollFingerprintsFromResponse(response);
             }
 
-            // Step 3: Sync fingerprints from API (if reset successful)
-            final boolean finalDatabaseReset = databaseReset;
-            final boolean finalScannerReset = scannerReset;
-            final String finalErrorMessage = errorMessage;
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "✗ Failed to download fingerprints from server: " + error);
+                mainHandler.post(() -> {
+                    String message = "✗ Sync Failed\n\n" +
+                                   "Error: " + error + "\n\n" +
+                                   "Please check:\n" +
+                                   "• Network connection\n" +
+                                   "• Server is running\n" +
+                                   "• Base URL in settings";
+                    Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
 
-            if (databaseReset && scannerReset) {
-                // Reset successful - now sync from API
-                Log.d(TAG, "");
+    /**
+     * Enroll fingerprints to scanner from downloaded response
+     * Uses ONLY the NEW endpoint data - NO calls to old interim endpoints
+     */
+    private void enrollFingerprintsFromResponse(AllEmployeesFingerprintsResponse response) {
+        executor.execute(() -> {
+            int totalProcessed = 0;
+            int successCount = 0;
+            int failCount = 0;
+            int skippedCount = 0;
+
+            try {
+                // Reconnect to scanner (same as Interim approach)
+                Log.d(TAG, "Connecting to scanner...");
+                sdk.UF_Reconnect();
+                Log.d(TAG, "UF_Reconnect called");
+                Thread.sleep(200);
+
+                // Check scanner status
+                int[] numTemplates = new int[1];
+                UF_RET_CODE statusRet = sdk.UF_GetNumOfTemplate(numTemplates);
+                Log.d(TAG, "UF_GetNumOfTemplate result: " + statusRet + ", count: " + numTemplates[0]);
+
+                // Check if scanner is actually ready
+                if (statusRet != UF_RET_CODE.UF_RET_SUCCESS) {
+                    Log.e(TAG, "╔════════════════════════════════════════════════════════════");
+                    Log.e(TAG, "║ SCANNER NOT READY!");
+                    Log.e(TAG, "║ Status: " + statusRet);
+                    Log.e(TAG, "╚════════════════════════════════════════════════════════════");
+                    mainHandler.post(() -> {
+                        Toast.makeText(SystemSettingsActivity.this,
+                            "Scanner not ready: " + statusRet,
+                            Toast.LENGTH_LONG).show();
+                    });
+                    return;
+                }
+
                 Log.d(TAG, "╔════════════════════════════════════════════════════════════");
-                Log.d(TAG, "║ STEP 3: SYNCING FINGERPRINTS FROM API");
+                Log.d(TAG, "║ ENROLLING FINGERPRINTS TO SCANNER");
+                Log.d(TAG, "║ Scanner Status: " + statusRet + " (Ready!)");
+                Log.d(TAG, "║ Existing Templates: " + numTemplates[0]);
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                // Loop through all employees
+                for (AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee : response.getEmployees()) {
+
+                    // Skip employees with no fingerprints
+                    if (employee.getFingerprints() == null || employee.getFingerprints().isEmpty()) {
+                        continue;
+                    }
+
+                    Log.d(TAG, "Processing: " + employee.getFullName() +
+                               " (ID: " + employee.getId() + ", Staff: " + employee.getStaffID() + ") - " +
+                               employee.getFingerprints().size() + " fingerprint(s)");
+
+                    // Process each fingerprint for this employee
+                    for (AllEmployeesFingerprintsResponse.FingerprintData fingerprint : employee.getFingerprints()) {
+                        totalProcessed++;
+
+                        try {
+                            // Decode Base64 template
+                            byte[] templateBytes = android.util.Base64.decode(
+                                fingerprint.getTemplateData(),
+                                android.util.Base64.DEFAULT
+                            );
+
+                            Log.d(TAG, "  → Raw template size: " + templateBytes.length + " bytes");
+
+                            // STEP 1: Save fingerprint to SQLite database FIRST
+                            // This is REQUIRED before enrolling to scanner
+                            Log.d(TAG, "  → Saving to database...");
+
+                            // Convert fingerType int to string
+                            String fingerTypeStr = getFingerTypeName(fingerprint.getFingerIndex());
+
+                            int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
+                                String.valueOf(fingerprint.getId()),        // API ID
+                                employee.getStaffID(),                      // Employee Number
+                                employee.getStaffID(),                      // Username (use staffID)
+                                employee.getFullName(),                     // Name
+                                employee.getDepartment() != null ? employee.getDepartment() : "N/A", // Role
+                                fingerprint.getTemplateData(),              // Base64 template data
+                                fingerprint.getLeftRight(),                 // 0=Left, 1=Right
+                                fingerprint.getFingerIndex(),               // 0-4 (Thumb to Little)
+                                fingerTypeStr                               // Finger type name
+                            );
+
+                            if (scannerId == -1) {
+                                Log.e(TAG, "  ✗ Failed to save to database - skipping scanner enrollment");
+                                failCount++;
+                                continue;
+                            }
+                            Log.d(TAG, "  ✓ Saved to database (Scanner ID: " + scannerId + ")");
+
+                            // STEP 2: Now enroll to scanner
+                            // Check if this is concatenated templates (768 = 384 * 2)
+                            int STANDARD_TEMPLATE_SIZE = 384;
+                            int templateCount = templateBytes.length / STANDARD_TEMPLATE_SIZE;
+
+                            if (templateBytes.length % STANDARD_TEMPLATE_SIZE != 0) {
+                                Log.e(TAG, "  ✗ Invalid template size: " + templateBytes.length);
+                                failCount++;
+                                continue;
+                            }
+
+                            Log.d(TAG, "  → Detected " + templateCount + " template(s) of " + STANDARD_TEMPLATE_SIZE + " bytes each");
+
+                            // Process each 384-byte template separately
+                            for (int t = 0; t < templateCount; t++) {
+                                byte[] singleTemplate = new byte[STANDARD_TEMPLATE_SIZE];
+                                System.arraycopy(templateBytes, t * STANDARD_TEMPLATE_SIZE, singleTemplate, 0, STANDARD_TEMPLATE_SIZE);
+
+                                // Log first 16 bytes
+                                StringBuilder hex = new StringBuilder();
+                                for (int i = 0; i < Math.min(16, singleTemplate.length); i++) {
+                                    hex.append(String.format("%02X ", singleTemplate[i]));
+                                }
+                                Log.d(TAG, "  → Template #" + (t+1) + " first 16 bytes: " + hex.toString());
+
+                                // Enroll template to scanner using DATABASE scanner ID as USER ID
+                                // This ensures when UF_Identify returns a scanner ID, it matches our database
+                                int[] enrollId = new int[1];
+                                long startTime = System.currentTimeMillis();
+
+                                UF_RET_CODE enrollRet = sdk.UF_EnrollTemplate(
+                                    scannerId,                                // USER ID = Database Scanner ID (10001, 10002, etc)
+                                    UF_ENROLL_OPTION.UF_ENROLL_NONE,         // Use provided ID, don't auto-generate
+                                    STANDARD_TEMPLATE_SIZE,                   // Always 384 bytes
+                                    singleTemplate,                           // Single template
+                                    enrollId                                   // Output: assigned enroll ID
+                                );
+
+                                long elapsed = System.currentTimeMillis() - startTime;
+                                Log.d(TAG, "  → UF_EnrollTemplate #" + (t+1) + " completed in " + elapsed + "ms");
+                                Log.d(TAG, "  → Result: " + enrollRet);
+
+                                if (enrollRet == UF_RET_CODE.UF_RET_SUCCESS) {
+                                    Log.d(TAG, "  ✓ Template #" + (t+1) + " enrolled successfully (Scanner ID: " + enrollId[0] + ")");
+                                    successCount++;
+                                } else {
+                                    Log.e(TAG, "  ✗ Template #" + (t+1) + " enrollment failed: " + enrollRet);
+                                    if (enrollRet.toString().contains("DUPLICATE")) {
+                                        skippedCount++;
+                                    } else {
+                                        failCount++;
+                                    }
+                                }
+                            }
+
+                        } catch (Exception e) {
+                            Log.e(TAG, "  ✗ Error: " + e.getMessage());
+                            failCount++;
+                        }
+                    }
+                }
+
+                // Fix provisional templates
+                sdk.UF_FixProvisionalTemplate();
+
+                // Final results
+                final int finalSuccess = successCount;
+                final int finalFail = failCount;
+                final int finalSkipped = skippedCount;
+                final int finalTotal = totalProcessed;
+
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ FINGERPRINT SYNC COMPLETE");
+                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ Total Downloaded: " + response.getTotalFingerprints() + " fingerprints");
+                Log.d(TAG, "║ Processed: " + finalTotal);
+                Log.d(TAG, "║ Successfully Enrolled: " + finalSuccess);
+                Log.d(TAG, "║ Skipped (already enrolled): " + finalSkipped);
+                Log.d(TAG, "║ Failed: " + finalFail);
                 Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
                 mainHandler.post(() -> {
-                    Toast.makeText(this, "✓ Reset complete!\nSyncing fingerprints from server...", Toast.LENGTH_SHORT).show();
+                    String message = "✓ Fingerprint Sync Complete!\n\n" +
+                                   "✓ Downloaded: " + response.getTotalFingerprints() + " fingerprint(s)\n" +
+                                   "✓ Enrolled to scanner: " + finalSuccess + "\n";
+
+                    if (finalSkipped > 0) {
+                        message += "⊘ Skipped (already enrolled): " + finalSkipped + "\n";
+                    }
+
+                    if (finalFail > 0) {
+                        message += "⚠ Failed: " + finalFail + "\n";
+                    }
+
+                    message += "\n✓ All data synced from NEW endpoint!";
+                    Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
                 });
 
-                syncService.syncFingerprintsFromAPI(new FingerprintSyncService.SyncCallback() {
-                    @Override
-                    public void onSyncStarted(int totalFingerprints) {
-                        Log.d(TAG, "Sync started: " + totalFingerprints + " fingerprints to process");
-                        mainHandler.post(() -> {
-                            Toast.makeText(SystemSettingsActivity.this,
-                                "Syncing " + totalFingerprints + " fingerprints...",
-                                Toast.LENGTH_SHORT).show();
-                        });
-                    }
-
-                    @Override
-                    public void onFingerprintEnrolled(int current, int total, String employeeName) {
-                        Log.d(TAG, "Progress: " + current + "/" + total + " - " + employeeName);
-                        // Optional: Update UI with progress if needed
-                    }
-
-                    @Override
-                    public void onSyncCompleted(int totalSynced, int totalEnrolled) {
-                        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
-                        Log.d(TAG, "║ RESET & SYNC COMPLETE");
-                        Log.d(TAG, "╠════════════════════════════════════════════════════════════");
-                        Log.d(TAG, "║ Database: ✓ Reset");
-                        Log.d(TAG, "║ Scanner: ✓ Cleared");
-                        Log.d(TAG, "║ Synced: " + totalSynced + " fingerprints");
-                        Log.d(TAG, "║ Enrolled: " + totalEnrolled + " to scanner");
-                        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
-
-                        mainHandler.post(() -> {
-                            String message = "✓ Reset & Sync Complete!\n\n" +
-                                           "✓ Database reset\n" +
-                                           "✓ Scanner memory cleared\n" +
-                                           "✓ Synced " + totalSynced + " fingerprint(s)\n" +
-                                           "✓ Enrolled " + totalEnrolled + " to scanner\n\n" +
-                                           "All fingerprints restored from server!";
-                            Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
-                        });
-                    }
-
-                    @Override
-                    public void onSyncError(String error) {
-                        Log.e(TAG, "✗ Sync failed after reset: " + error);
-                        mainHandler.post(() -> {
-                            String message = "⚠ Reset successful but sync failed\n\n" +
-                                           "✓ Database reset\n" +
-                                           "✓ Scanner cleared\n" +
-                                           "✗ Sync error: " + error + "\n\n" +
-                                           "Please sync manually or check network.";
-                            Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
-                        });
-                    }
-                });
-
-            } else {
-                // Reset failed - show error without attempting sync
+            } catch (Exception e) {
+                Log.e(TAG, "✗ Enrollment error: " + e.getMessage(), e);
                 mainHandler.post(() -> {
-                    StringBuilder message = new StringBuilder();
-
-                    if (finalDatabaseReset) {
-                        message.append("⚠ Partial reset\n\n");
-                        message.append("✓ Database reset\n");
-                        message.append("✗ Scanner reset failed\n\n");
-                        message.append("Error: ").append(finalErrorMessage);
-                    } else {
-                        message.append("✗ Reset failed\n\n");
-                        message.append(finalErrorMessage);
-                    }
-                    Toast.makeText(this, message.toString(), Toast.LENGTH_LONG).show();
+                    String message = "⚠ Enrollment failed\n\n" +
+                                   "Error: " + e.getMessage() + "\n\n" +
+                                   "Please check scanner connection.";
+                    Toast.makeText(SystemSettingsActivity.this, message, Toast.LENGTH_LONG).show();
                 });
             }
         });
@@ -535,6 +714,22 @@ public class SystemSettingsActivity extends AppCompatActivity {
         super.onBackPressed();
         // Add any custom back navigation logic here
         finish();
+    }
+
+    /**
+     * Convert finger index to finger type name
+     * @param fingerIndex 0-4 (Thumb, Index, Middle, Ring, Little)
+     * @return Finger type name string
+     */
+    private String getFingerTypeName(int fingerIndex) {
+        switch (fingerIndex) {
+            case 0: return "Thumb";
+            case 1: return "Index";
+            case 2: return "Middle";
+            case 3: return "Ring";
+            case 4: return "Little";
+            default: return "Unknown";
+        }
     }
 
     @Override

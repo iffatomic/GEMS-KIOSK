@@ -5,6 +5,8 @@
 
 package com.supremainc.sfm_sdk_android.utils;
 
+import android.util.Base64;
+
 import java.util.Arrays;
 
 /**
@@ -71,6 +73,40 @@ public class FingerprintUtils {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid fingerprint string format: " + templateString, e);
         }
+    }
+
+    /**
+     * Convert Base64 string to byte array
+     * Used for new FingerprintDownload endpoint that returns Base64 encoded templates
+     * Example: "RRsOFZEAU0IoA5ClhC..." -> byte[384]
+     *
+     * @param base64String Base64 encoded fingerprint template
+     * @return Byte array containing fingerprint template data
+     */
+    public static byte[] convertBase64ToByteArray(String base64String) {
+        if (base64String == null || base64String.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            return Base64.decode(base64String, Base64.DEFAULT);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid Base64 fingerprint format: " + base64String, e);
+        }
+    }
+
+    /**
+     * Convert byte array to Base64 string
+     * Example: byte[384] -> "RRsOFZEAU0IoA5ClhC..."
+     *
+     * @param template Fingerprint template byte array
+     * @return Base64 encoded string
+     */
+    public static String convertByteArrayToBase64(byte[] template) {
+        if (template == null) {
+            return null;
+        }
+        return Base64.encodeToString(template, Base64.DEFAULT);
     }
 
     /**

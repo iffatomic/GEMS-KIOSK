@@ -50,6 +50,11 @@ public class LoginActivity extends AppCompatActivity {
     private Button loginButton, fingerprintLoginButton;
     private ProgressBar progressBar;
     private Spinner languageSpinner;
+    private android.widget.ImageView appLogo;
+
+    // Double-tap tracking for logo
+    private long lastLogoTapTime = 0;
+    private static final long DOUBLE_TAP_INTERVAL = 500; // ms
 
     // Database and Preferences
     private DatabaseHelper dbHelper;
@@ -141,6 +146,7 @@ public class LoginActivity extends AppCompatActivity {
         fingerprintLoginButton = findViewById(R.id.fingerprintLoginButton);
         progressBar = findViewById(R.id.progressBar);
         languageSpinner = findViewById(R.id.language_spinner);
+        appLogo = findViewById(R.id.app_logo);
 
         // Initially hide progress bar
         progressBar.setVisibility(View.GONE);
@@ -293,10 +299,22 @@ public class LoginActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         loginButton.setOnClickListener(v -> performLogin());
+
+        // Enable fingerprint authentication
         fingerprintLoginButton.setOnClickListener(v -> {
-            Intent intent = new Intent(LoginActivity.this, MainMenuActivity.class);
-            startActivity(intent);
-            finish();
+            showFingerprintDialog();
+        });
+
+        // Double-tap logo to access SystemSettings (same as MainActivity)
+        appLogo.setOnClickListener(v -> {
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastLogoTapTime < DOUBLE_TAP_INTERVAL) {
+                // Double-tap detected!
+                Log.d(TAG, "Double-tap on logo detected - Opening System Settings");
+                Intent intent = new Intent(LoginActivity.this, SystemSettingsActivity.class);
+                startActivity(intent);
+            }
+            lastLogoTapTime = currentTime;
         });
     }
 
@@ -433,40 +451,56 @@ public class LoginActivity extends AppCompatActivity {
                     int scannedScannerID = userID[0];
                     Log.d(TAG, "Fingerprint identified with scanner ID: " + scannedScannerID);
 
-                    // Find user in database by scanner ID
-                    DatabaseHelper.User user = dbHelper.getUserByScannerUserId(scannedScannerID);
+                    // Try finding user in TABLE_USERS first
+                    final DatabaseHelper.User user = dbHelper.getUserByScannerUserId(scannedScannerID);
+
+                    // If not found in users, check synced fingerprints table
+                    final DatabaseHelper.SyncedFingerprint syncedUser;
+                    if (user == null) {
+                        Log.d(TAG, "Not found in users table, checking synced_fingerprints...");
+                        syncedUser = dbHelper.getUserByScannerId(scannedScannerID);
+                    } else {
+                        syncedUser = null;
+                    }
 
                     mainHandler.post(() -> {
                         fingerprintProgress.setVisibility(View.GONE);
                         isScanning = false;
 
+                        // Handle regular user authentication
                         if (user != null) {
-                            // Check if user is admin/supervisor
-                            if (user.isAdmin()) {
-                                // SUCCESS! Login with this user
-                                Log.d(TAG, "Admin/Supervisor login successful: " + user.getName());
+                            // SUCCESS! Login with this user (ignore role check for now)
+                            Log.d(TAG, "User login successful: " + user.getName());
 
-                                fingerprintInstruction.setText("✓ Login Successful!\nWelcome, " + user.getName());
-                                fingerprintInstruction.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+                            fingerprintInstruction.setText("✓ Login Successful!\nWelcome, " + user.getName());
+                            fingerprintInstruction.setTextColor(getResources().getColor(android.R.color.holo_green_light));
 
-                                // Delay to show success message
-                                new Handler().postDelayed(() -> {
-                                    dialog.dismiss();
-                                    saveLoginState(user.getStaffId());
-                                    showToast("Welcome, " + user.getName() + "!");
-                                    navigateToMainMenu();
-                                }, 1000);
+                            // Delay to show success message
+                            new Handler().postDelayed(() -> {
+                                dialog.dismiss();
+                                saveLoginState(user.getStaffId());
+                                showToast("Welcome, " + user.getName() + "!");
+                                navigateToMainMenu();
+                            }, 1000);
 
-                            } else {
-                                // Regular user - not allowed to login
-                                Log.w(TAG, "Regular user attempted login: " + user.getName());
-                                fingerprintInstruction.setText("❌ Access Denied\nOnly supervisors can login");
-                                fingerprintInstruction.setTextColor(getResources().getColor(android.R.color.holo_red_light));
-                                showToast("Only supervisors can login via fingerprint");
-                            }
+                        // Handle synced user authentication (from server)
+                        } else if (syncedUser != null) {
+                            // SUCCESS! Login with synced user (ignore role check for now)
+                            Log.d(TAG, "Synced user login successful: " + syncedUser.getName());
+
+                            fingerprintInstruction.setText("✓ Login Successful!\nWelcome, " + syncedUser.getName());
+                            fingerprintInstruction.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+
+                            // Delay to show success message
+                            new Handler().postDelayed(() -> {
+                                dialog.dismiss();
+                                saveLoginState(syncedUser.getEmployeeNumber());
+                                showToast("Welcome, " + syncedUser.getName() + "!");
+                                navigateToMainMenu();
+                            }, 1000);
 
                         } else {
-                            // User not found in database
+                            // User not found in either database
                             Log.w(TAG, "Fingerprint identified but user not found for scanner ID: " + scannedScannerID);
                             fingerprintInstruction.setText("❌ User not found\nPlease contact administrator");
                             fingerprintInstruction.setTextColor(getResources().getColor(android.R.color.holo_red_light));

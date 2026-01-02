@@ -85,6 +85,7 @@
 
                 <!-- App Logo -->
                 <ImageView
+                    android:id="@+id/app_logo"
                     android:layout_width="100dp"
                     android:layout_height="100dp"
                     android:src="@drawable/bnm_logo_official"

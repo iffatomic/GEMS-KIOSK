@@ -374,12 +374,12 @@ public class StaffEnrollmentApiClient {
      */
     public void getAllFingerprints(ApiCallback<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse>> callback) {
         Log.d(TAG, "╔═══════════════════════════════════════════");
-        Log.d(TAG, "║ GET ALL FINGERPRINTS REQUEST (NEW ENDPOINT)");
+        Log.d(TAG, "║ GET ALL FINGERPRINTS REQUEST (WORKING ENDPOINT)");
         Log.d(TAG, "╚═══════════════════════════════════════════");
 
         Type responseType = new TypeToken<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse>>(){}.getType();
         baseClient.get(
-                ApiConstants.ENDPOINT_FINGERPRINT_DOWNLOAD,
+                ApiConstants.ENDPOINT_STAFF_GET_ALL_FINGERPRINTS,
                 null,
                 responseType,
                 new ApiCallback<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse>>() {

@@ -414,13 +414,13 @@
 
             </LinearLayout>
 
-            <!-- Reset Database Card -->
+            <!-- Reset & Sync Fingerprints Card -->
             <LinearLayout
-                android:id="@+id/reset_database_card"
+                android:id="@+id/sync_fingerprints_card"
                 android:layout_width="match_parent"
                 android:layout_height="120dp"
                 android:orientation="vertical"
-                android:background="@drawable/container_background_red"
+                android:background="@drawable/container_background"
                 android:padding="20dp"
                 android:elevation="2dp"
                 android:gravity="center"
@@ -430,14 +430,14 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🗑️"
+                    android:text="🔄"
                     android:textSize="32sp"
                     android:layout_marginBottom="8dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Reset Database &amp; Sync"
+                    android:text="Reset &amp; Sync Fingerprints"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/textPrimary"
@@ -446,7 +446,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Clear local data and re-sync from server"
+                    android:text="Clear scanner and database, then sync from server"
                     android:textSize="12sp"
                     android:textColor="@color/textSecondary"
                     android:gravity="center"

@@ -152,7 +152,7 @@ public class SignalRService {
         }, com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto.class);
 
         // ========== Listen for Fingerprint Enrollment Completion ==========
-        hubConnection.on("FingerprintEnrollmentCompleted", (event) -> {
+        hubConnection.on(ApiConstants.SIGNALR_FINGERPRINT_ENROLLMENT, (event) -> {
             Log.d(TAG, "╔════════════════════════════════════════════════════════════");
             Log.d(TAG, "║ FINGERPRINT ENROLLMENT COMPLETED");
             Log.d(TAG, "╠════════════════════════════════════════════════════════════");

@@ -99,6 +99,7 @@ public class ApiConstants {
     public static final String SIGNALR_MANUAL_OVERRIDE = "ManualOverrideEvent";
     public static final String SIGNALR_DOOR_STATE_CHANGED = "DoorStateChanged";
     public static final String SIGNALR_VAULT_INCIDENT = "VaultIncidentOccurred";
+    public static final String SIGNALR_FINGERPRINT_ENROLLMENT = "FingerprintEnrollmentCompleted";
 
     /**
      * Get PAC_API base URL from SharedPreferences or use default

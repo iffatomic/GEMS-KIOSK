@@ -10,6 +10,7 @@ import android.util.Log;
 
 import com.supremainc.sfm_sdk_android.SignalRService;
 import com.supremainc.sfm_sdk_android.data.model.response.VaultIncidentLog;
+import com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto;
 import com.supremainc.sfm_sdk_android.dto.signalr.KeySwitchAggregateEventDto;
 import com.supremainc.sfm_sdk_android.dto.signalr.KeySwitchEventDto;
 import com.supremainc.sfm_sdk_android.dto.signalr.VaultIncidentBroadcastDto;
@@ -446,6 +447,12 @@ public class VaultIncidentLogServiceUsageExample {
             }
 
             @Override
+            public void onFingerprintEnrollmentCompleted(FingerprintEnrollmentEventDto event) {
+                // Handle fingerprint enrollment events
+                Log.i(TAG, "Fingerprint enrollment completed for: " + event.getFullName());
+            }
+
+            @Override
             public void onConnectionClosed() {
                 Log.w(TAG, "SignalR connection closed");
                 showToast("Real-time monitoring disconnected");
@@ -578,6 +585,11 @@ public class VaultIncidentLogServiceUsageExample {
 
                 @Override
                 public void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event) {
+                }
+
+                @Override
+                public void onFingerprintEnrollmentCompleted(FingerprintEnrollmentEventDto event) {
+                    // Handle fingerprint enrollment events
                 }
 
                 @Override

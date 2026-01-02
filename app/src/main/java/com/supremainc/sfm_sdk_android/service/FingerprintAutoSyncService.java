@@ -249,4 +249,42 @@ public class FingerprintAutoSyncService extends Service {
             }, 5000);
         }
     }
+
+    /**
+     * PUBLIC TEST METHOD - Manually trigger sync for testing
+     * Call this from anywhere to test fingerprint download and enrollment
+     */
+    public void manualTriggerSync() {
+        Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.i(TAG, "║ MANUAL TEST SYNC TRIGGERED");
+        Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+
+        // Just call the incremental sync directly
+        fingerprintSyncService.syncAllFingerprintsIncremental(new FingerprintSyncService.SyncCallback() {
+            @Override
+            public void onSyncStarted(int totalFingerprints) {
+                Log.d(TAG, "Manual sync started: " + totalFingerprints + " fingerprints to check");
+            }
+
+            @Override
+            public void onFingerprintEnrolled(int current, int total, String employeeName) {
+                Log.d(TAG, "Enrolled: " + employeeName + " (" + current + "/" + total + ")");
+            }
+
+            @Override
+            public void onSyncCompleted(int successCount, int failCount) {
+                Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.i(TAG, "║ MANUAL SYNC COMPLETED");
+                Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.i(TAG, "║ New enrollments: " + successCount);
+                Log.i(TAG, "║ Failed: " + failCount);
+                Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+            }
+
+            @Override
+            public void onSyncError(String error) {
+                Log.e(TAG, "✗ Manual sync error: " + error);
+            }
+        });
+    }
 }

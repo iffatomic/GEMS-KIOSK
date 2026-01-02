@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
 import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
+import com.supremainc.sfm_sdk_android.service.FingerprintAutoSyncService;
 import com.supremainc.sfm_sdk_android.util.ApiConstants;
 import com.supremainc.sfm_sdk_android.util.ConfigManager;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
