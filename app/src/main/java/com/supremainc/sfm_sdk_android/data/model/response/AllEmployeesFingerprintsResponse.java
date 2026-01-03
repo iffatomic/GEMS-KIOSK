@@ -201,7 +201,7 @@ public class AllEmployeesFingerprintsResponse {
         private int employeeId;
 
         @SerializedName("templateData")
-        private String templateData;  // Base64 encoded fingerprint template
+        private byte[] templateData;  // Raw byte array fingerprint template (NO Base64!)
 
         @SerializedName("leftRight")
         private int leftRight;  // 0 = Left, 1 = Right
@@ -239,11 +239,11 @@ public class AllEmployeesFingerprintsResponse {
             this.employeeId = employeeId;
         }
 
-        public String getTemplateData() {
+        public byte[] getTemplateData() {
             return templateData;
         }
 
-        public void setTemplateData(String templateData) {
+        public void setTemplateData(byte[] templateData) {
             this.templateData = templateData;
         }
 

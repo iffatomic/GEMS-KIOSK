@@ -25,6 +25,8 @@ import com.supremainc.sfm_sdk_android.service.FingerprintSyncService;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -565,11 +567,14 @@ public class SystemSettingsActivity extends AppCompatActivity {
                         totalProcessed++;
 
                         try {
-                            // Decode Base64 template
-                            byte[] templateBytes = android.util.Base64.decode(
-                                fingerprint.getTemplateData(),
-                                android.util.Base64.DEFAULT
-                            );
+                            // Get raw byte array template (NO Base64 decode needed!)
+                            byte[] templateBytes = fingerprint.getTemplateData();
+
+                            if (templateBytes == null || templateBytes.length == 0) {
+                                Log.e(TAG, "  ✗ Empty template data - skipping");
+                                failCount++;
+                                continue;
+                            }
 
                             Log.d(TAG, "  → Raw template size: " + templateBytes.length + " bytes");
 
@@ -580,13 +585,14 @@ public class SystemSettingsActivity extends AppCompatActivity {
                             // Convert fingerType int to string
                             String fingerTypeStr = getFingerTypeName(fingerprint.getFingerIndex());
 
+                            // Save raw byte[] directly to database (BLOB column)
                             int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
                                 String.valueOf(fingerprint.getId()),        // API ID
                                 employee.getStaffID(),                      // Employee Number
                                 employee.getStaffID(),                      // Username (use staffID)
                                 employee.getFullName(),                     // Name
                                 employee.getDepartment() != null ? employee.getDepartment() : "N/A", // Role
-                                fingerprint.getTemplateData(),              // Base64 template data
+                                templateBytes,                              // Raw byte[] (stored as BLOB)
                                 fingerprint.getLeftRight(),                 // 0=Left, 1=Right
                                 fingerprint.getFingerIndex(),               // 0-4 (Thumb to Little)
                                 fingerTypeStr                               // Finger type name
@@ -599,13 +605,33 @@ public class SystemSettingsActivity extends AppCompatActivity {
                             }
                             Log.d(TAG, "  ✓ Saved to database (Scanner ID: " + scannerId + ")");
 
-                            // STEP 2: Now enroll to scanner
-                            // Check if this is concatenated templates (768 = 384 * 2)
-                            int STANDARD_TEMPLATE_SIZE = 384;
-                            int templateCount = templateBytes.length / STANDARD_TEMPLATE_SIZE;
+                            // STEP 2: Read template from database and convert back to byte[]
+                            Log.d(TAG, "  → Reading template from database...");
+                            String templateString = dbHelper.getTemplateDataByScannerId(scannerId);
 
-                            if (templateBytes.length % STANDARD_TEMPLATE_SIZE != 0) {
-                                Log.e(TAG, "  ✗ Invalid template size: " + templateBytes.length);
+                            if (templateString == null) {
+                                Log.e(TAG, "  ✗ Failed to read template from database");
+                                failCount++;
+                                continue;
+                            }
+
+                            Log.d(TAG, "  → Converting string to byte array...");
+                            byte[] templateBytesFromDb = DatabaseHelper.parseStringToByteArray(templateString);
+
+                            if (templateBytesFromDb == null) {
+                                Log.e(TAG, "  ✗ Failed to convert template string to byte array");
+                                failCount++;
+                                continue;
+                            }
+
+                            Log.d(TAG, "  ✓ Template converted from database (size: " + templateBytesFromDb.length + " bytes)");
+
+                            // STEP 3: Now enroll to scanner - split if needed
+                            int STANDARD_TEMPLATE_SIZE = 384;
+                            int templateCount = templateBytesFromDb.length / STANDARD_TEMPLATE_SIZE;
+
+                            if (templateBytesFromDb.length % STANDARD_TEMPLATE_SIZE != 0) {
+                                Log.e(TAG, "  ✗ Invalid template size: " + templateBytesFromDb.length);
                                 failCount++;
                                 continue;
                             }
@@ -615,7 +641,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
                             // Process each 384-byte template separately
                             for (int t = 0; t < templateCount; t++) {
                                 byte[] singleTemplate = new byte[STANDARD_TEMPLATE_SIZE];
-                                System.arraycopy(templateBytes, t * STANDARD_TEMPLATE_SIZE, singleTemplate, 0, STANDARD_TEMPLATE_SIZE);
+                                System.arraycopy(templateBytesFromDb, t * STANDARD_TEMPLATE_SIZE, singleTemplate, 0, STANDARD_TEMPLATE_SIZE);
 
                                 // Log first 16 bytes
                                 StringBuilder hex = new StringBuilder();
@@ -646,7 +672,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
                                     successCount++;
                                 } else {
                                     Log.e(TAG, "  ✗ Template #" + (t+1) + " enrollment failed: " + enrollRet);
-                                    if (enrollRet.toString().contains("DUPLICATE")) {
+                                    if (enrollRet == UF_RET_CODE.UF_ERR_EXIST_ID) {
                                         skippedCount++;
                                     } else {
                                         failCount++;
@@ -663,6 +689,25 @@ public class SystemSettingsActivity extends AppCompatActivity {
 
                 // Fix provisional templates
                 sdk.UF_FixProvisionalTemplate();
+
+                // Save templates to persistent flash memory
+                // WITHOUT THIS: Templates exist only in RAM and are lost when scanner disconnects
+                Log.d(TAG, "════════════════════════════════════════════════════════════");
+                Log.d(TAG, "Saving templates to persistent flash memory...");
+                long saveStartTime = System.currentTimeMillis();
+
+                UF_RET_CODE saveRet = sdk.UF_Save();
+
+                long saveElapsed = System.currentTimeMillis() - saveStartTime;
+                Log.d(TAG, "UF_Save() completed in " + saveElapsed + "ms");
+                Log.d(TAG, "Result: " + saveRet);
+
+                if (saveRet == UF_RET_CODE.UF_RET_SUCCESS) {
+                    Log.d(TAG, "✓ Templates successfully persisted to flash memory");
+                } else {
+                    Log.e(TAG, "✗ Failed to save templates to flash: " + saveRet);
+                    Log.e(TAG, "⚠ WARNING: Templates may be lost when scanner disconnects!");
+                }
 
                 // Final results
                 final int finalSuccess = successCount;
@@ -757,5 +802,66 @@ public class SystemSettingsActivity extends AppCompatActivity {
         if (dbHelper != null) {
             dbHelper.close();
         }
+    }
+
+    boolean Enroll(int id, int fingerCount, byte[] template, String employeeNumber)
+    {
+        final String TAG = "Enroll_2";
+        UF_RET_CODE ret = null;
+
+
+        int userID = id;
+        int[] enrollID = new int[1];
+        int[] imageQuality = new int[1];
+        int[] numOfTemplate = new int[1];
+        byte[] templateData = new byte[3840];
+        int[] templateSize = new int[1];
+        int[] _userID = new int[1];
+        byte[] _subID = new byte[1];
+
+        enrollID[0] = 0;
+        imageQuality[0] = 0;
+        templateSize[0] = template.length;
+        templateData = template;
+
+        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.d(TAG, "║ ENROLLING TO SCANNER");
+        Log.d(TAG, "║ User ID (Scanner ID): " + userID);
+        Log.d(TAG, "║ Employee Number: " + employeeNumber);
+        Log.d(TAG, "║ Template Size: " + templateSize[0] + " bytes");
+        Log.d(TAG, "║ Finger Count: " + fingerCount);
+        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+        ret = sdk.UF_EnrollTemplate(userID, UF_ENROLL_OPTION.UF_ENROLL_NONE, templateSize[0], templateData, enrollID);
+
+        Log.d(TAG, "UF_EnrollTemplate Result: " + ret);
+        Log.d(TAG, "Return Code String: " + (ret != null ? ret.toString() : "NULL"));
+        Log.d(TAG, "Enroll ID returned: " + enrollID[0]);
+
+        if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
+            Log.d(TAG, "✓ Enroll SUCCESS - enrollID: " + enrollID[0] + ", User ID: " + userID + ", Employee: " + employeeNumber + ", Template: " + Arrays.toString(template));
+            return true;
+        } else {
+            Log.e(TAG, "✗ Enroll FAILED");
+            Log.e(TAG, "  Return Code: " + ret);
+            Log.e(TAG, "  User ID: " + userID);
+            Log.e(TAG, "  Template Size: " + templateSize[0] + " bytes");
+            Log.e(TAG, "  Template Data: " + Arrays.toString(templateData));
+            Log.e(TAG, "  Expected: 384 bytes (standard) or 768 bytes (concatenated)");
+
+            if (ret == UF_RET_CODE.UF_ERR_TIME_OUT) {
+                Log.e(TAG, "  Error Type: TIMEOUT");
+            } else if (ret == UF_RET_CODE.UF_ERR_EXIST_ID) {
+                Log.e(TAG, "  Error Type: ID ALREADY EXISTS");
+            } else if (ret == UF_RET_CODE.UF_ERR_INVALID_PARAMETER) {
+                Log.e(TAG, "  Error Type: INVALID PARAMETER");
+            } else if (ret == UF_RET_CODE.UF_ERR_DATA_ERROR) {
+                Log.e(TAG, "  Error Type: DATA ERROR");
+            } else {
+                Log.e(TAG, "  Error Type: " + (ret != null ? ret.toString() : "UNKNOWN"));
+            }
+        }
+
+        return false;
     }
 }

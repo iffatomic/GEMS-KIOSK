@@ -276,13 +276,19 @@ public class FingerprintSyncService {
                     }
 
                     // Insert or update in database (gets scanner ID)
+                    // Decode Base64 string to byte array for database storage
+                    byte[] templateBytes = android.util.Base64.decode(
+                            fp.getFingerPrintBase64(),
+                            android.util.Base64.DEFAULT
+                    );
+
                     int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
                             fp.getId(),
                             user.getEmployeeNumber(),
                             user.getUsername(),
                             user.getName(),
                             user.getRole(),
-                            fp.getFingerPrintBase64(),
+                            templateBytes,  // Pass byte[] instead of Base64 string
                             fp.getLeftRight(),
                             fp.getFingerIndex(),
                             fp.getFingerType()
@@ -293,9 +299,6 @@ public class FingerprintSyncService {
                         failCount++;
                         continue;
                     }
-
-                    // Convert template string to byte array
-                    byte[] templateBytes = FingerprintUtils.convertStringToByteArray(fp.getFingerPrintBase64());
 
                     if (templateBytes == null || templateBytes.length == 0) {
                         Log.e(TAG, "✗ Invalid template for: " + user.getName());
@@ -445,6 +448,12 @@ public class FingerprintSyncService {
                 current++;
 
                 try {
+                    // Decode Base64 string to byte array for database storage
+                    byte[] templateBytes = android.util.Base64.decode(
+                            fp.getFingerPrintBase64(),
+                            android.util.Base64.DEFAULT
+                    );
+
                     // Step 1: Store in database and get assigned scanner ID
                     int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
                             fp.getId(),                  // ULID string
@@ -452,7 +461,7 @@ public class FingerprintSyncService {
                             user.getUsername(),
                             user.getName(),
                             user.getRole(),              // User role (ADMIN or CUSTODIAN)
-                            fp.getFingerPrintBase64(),   // Already in Arrays.toString() format
+                            templateBytes,               // Pass byte[] instead of Base64 string
                             fp.getLeftRight(),
                             fp.getFingerIndex(),
                             fp.getFingerType()
@@ -475,9 +484,7 @@ public class FingerprintSyncService {
                         continue;
                     }
 
-                    // Step 2: Convert template string to byte array
-                    byte[] templateBytes = FingerprintUtils.convertStringToByteArray(fp.getFingerPrintBase64());
-
+                    // Step 2: Validate template bytes
                     if (templateBytes == null || templateBytes.length == 0) {
                         Log.e(TAG, "✗ Invalid template for: " + user.getName());
                         failCount++;
@@ -762,6 +769,12 @@ public class FingerprintSyncService {
             current++;
 
             try {
+                // Decode Base64 string to byte array for database storage
+                byte[] templateBytes = android.util.Base64.decode(
+                        fp.getFingerPrintBase64(),
+                        android.util.Base64.DEFAULT
+                );
+
                 // Step 1: Store in database and get assigned scanner ID
                 int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
                         fp.getId(),                  // ULID string
@@ -769,7 +782,7 @@ public class FingerprintSyncService {
                         data.getUsername(),
                         data.getName(),
                         data.getRole(),              // User role (ADMIN or CUSTODIAN)
-                        fp.getFingerPrintBase64(),   // Already in Arrays.toString() format
+                        templateBytes,               // Pass byte[] instead of Base64 string
                         fp.getLeftRight(),
                         fp.getFingerIndex(),
                         fp.getFingerType()
@@ -781,9 +794,7 @@ public class FingerprintSyncService {
                     continue;
                 }
 
-                // Step 2: Convert template string to byte array
-                byte[] templateBytes = FingerprintUtils.convertStringToByteArray(fp.getFingerPrintBase64());
-
+                // Step 2: Validate template bytes
                 if (templateBytes == null || templateBytes.length == 0) {
                     Log.e(TAG, "✗ Invalid template for: " + data.getName());
                     failCount++;

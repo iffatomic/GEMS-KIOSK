@@ -34,7 +34,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     // Database configuration
     private static final String DATABASE_NAME = "FingerprintDB";
-    private static final int DATABASE_VERSION = 10;  // Updated to version 10 for role field in synced_fingerprints
+    private static final int DATABASE_VERSION = 12;  // Updated to version 12 for TEXT template_data (Arrays.toString) in synced_fingerprints
 
     // Table names
     private static final String TABLE_USERS = "users";
@@ -64,7 +64,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String KEY_SYNCED_USERNAME = "username";               // Username
     private static final String KEY_SYNCED_NAME = "name";                       // Full name
     private static final String KEY_SYNCED_ROLE = "role";                       // "ADMIN" or "CUSTODIAN"
-    private static final String KEY_SYNCED_TEMPLATE_DATA = "template_data";     // Template as Arrays.toString() format
+    private static final String KEY_SYNCED_TEMPLATE_DATA = "template_data";     // Template as TEXT (Arrays.toString representation)
     private static final String KEY_SYNCED_LEFT_RIGHT = "left_right";           // 0 = Left, 1 = Right
     private static final String KEY_SYNCED_FINGER_INDEX = "finger_index";       // 1-10
     private static final String KEY_SYNCED_FINGER_TYPE = "finger_type";         // "Thumb", "Index", etc.
@@ -190,7 +190,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 + KEY_SYNCED_USERNAME + " TEXT NOT NULL,"
                 + KEY_SYNCED_NAME + " TEXT NOT NULL,"
                 + KEY_SYNCED_ROLE + " TEXT,"                       // "ADMIN" or "CUSTODIAN"
-                + KEY_SYNCED_TEMPLATE_DATA + " TEXT NOT NULL,"     // Arrays.toString() format
+                + KEY_SYNCED_TEMPLATE_DATA + " TEXT NOT NULL,"     // Arrays.toString representation
                 + KEY_SYNCED_LEFT_RIGHT + " INTEGER,"
                 + KEY_SYNCED_FINGER_INDEX + " INTEGER,"
                 + KEY_SYNCED_FINGER_TYPE + " TEXT,"
@@ -403,6 +403,41 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 Log.d(TAG, "Successfully upgraded to version 10 - Added role column to synced_fingerprints");
             } catch (Exception e) {
                 Log.e(TAG, "Error upgrading to version 10", e);
+                recreateDatabase(db);
+            }
+        }
+
+        // Upgrade from version 10 to 11 (change template_data from TEXT to BLOB)
+        if (oldVersion < 11) {
+            try {
+                // SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+                Log.d(TAG, "Upgrading to version 11 - Changing template_data to BLOB...");
+
+                // Drop old table (data will be re-synced from server)
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_SYNCED_FINGERPRINTS);
+
+                // Create new table with BLOB column
+                String CREATE_SYNCED_FINGERPRINTS_TABLE = "CREATE TABLE " + TABLE_SYNCED_FINGERPRINTS + "("
+                        + KEY_SYNCED_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        + KEY_SYNCED_API_ID + " TEXT UNIQUE NOT NULL,"
+                        + KEY_SYNCED_SCANNER_ID + " INTEGER UNIQUE,"
+                        + KEY_SYNCED_EMPLOYEE_NUMBER + " TEXT NOT NULL,"
+                        + KEY_SYNCED_USERNAME + " TEXT NOT NULL,"
+                        + KEY_SYNCED_NAME + " TEXT NOT NULL,"
+                        + KEY_SYNCED_ROLE + " TEXT,"
+                        + KEY_SYNCED_TEMPLATE_DATA + " BLOB NOT NULL,"     // Changed to BLOB
+                        + KEY_SYNCED_LEFT_RIGHT + " INTEGER,"
+                        + KEY_SYNCED_FINGER_INDEX + " INTEGER,"
+                        + KEY_SYNCED_FINGER_TYPE + " TEXT,"
+                        + KEY_SYNCED_ENROLLED_TO_SCANNER + " INTEGER DEFAULT 0,"
+                        + KEY_SYNCED_AT + " DATETIME DEFAULT CURRENT_TIMESTAMP"
+                        + ")";
+                db.execSQL(CREATE_SYNCED_FINGERPRINTS_TABLE);
+
+                Log.d(TAG, "Successfully upgraded to version 11 - template_data is now BLOB");
+                Log.d(TAG, "Note: Synced fingerprints cleared - please re-sync from server");
+            } catch (Exception e) {
+                Log.e(TAG, "Error upgrading to version 11", e);
                 recreateDatabase(db);
             }
         }
@@ -1631,14 +1666,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      * @param username Username
      * @param name Full name
      * @param role User role (ADMIN or CUSTODIAN)
-     * @param templateData Template in Arrays.toString() format
+     * @param templateData Template as raw byte array (BLOB)
      * @param leftRight 0 = Left, 1 = Right
      * @param fingerIndex Finger index 1-10
      * @param fingerType Finger type (Thumb, Index, etc.)
      * @return Scanner ID (integer) if successful, -1 if failed
      */
     public int insertOrUpdateSyncedFingerprint(String apiId, String employeeNumber, String username, String name,
-                                                 String role, String templateData, int leftRight, int fingerIndex, String fingerType) {
+                                                 String role, byte[] templateData, int leftRight, int fingerIndex, String fingerType) {
         SQLiteDatabase db = this.getWritableDatabase();
 
         // Check if this API ID already exists
@@ -1659,7 +1694,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             values.put(KEY_SYNCED_USERNAME, username);
             values.put(KEY_SYNCED_NAME, name);
             values.put(KEY_SYNCED_ROLE, role);
-            values.put(KEY_SYNCED_TEMPLATE_DATA, templateData);
+            values.put(KEY_SYNCED_TEMPLATE_DATA, java.util.Arrays.toString(templateData));
             values.put(KEY_SYNCED_LEFT_RIGHT, leftRight);
             values.put(KEY_SYNCED_FINGER_INDEX, fingerIndex);
             values.put(KEY_SYNCED_FINGER_TYPE, fingerType);
@@ -1696,7 +1731,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             values.put(KEY_SYNCED_USERNAME, username);
             values.put(KEY_SYNCED_NAME, name);
             values.put(KEY_SYNCED_ROLE, role);
-            values.put(KEY_SYNCED_TEMPLATE_DATA, templateData);
+            values.put(KEY_SYNCED_TEMPLATE_DATA, java.util.Arrays.toString(templateData));
             values.put(KEY_SYNCED_LEFT_RIGHT, leftRight);
             values.put(KEY_SYNCED_FINGER_INDEX, fingerIndex);
             values.put(KEY_SYNCED_FINGER_TYPE, fingerType);
@@ -2529,6 +2564,64 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     ", fingerType='" + fingerType + '\'' +
                     ", enrolled=" + enrolledToScanner +
                     '}';
+        }
+    }
+
+    /**
+     * Get template data string by scanner ID
+     * @param scannerId Scanner ID
+     * @return Template data as string (Arrays.toString format), or null if not found
+     */
+    public String getTemplateDataByScannerId(int scannerId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String templateString = null;
+
+        String query = "SELECT " + KEY_SYNCED_TEMPLATE_DATA + " FROM " + TABLE_SYNCED_FINGERPRINTS
+                + " WHERE " + KEY_SYNCED_SCANNER_ID + " = ?";
+
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(scannerId)});
+
+        if (cursor.moveToFirst()) {
+            templateString = cursor.getString(0);
+        }
+
+        cursor.close();
+        db.close();
+        return templateString;
+    }
+
+    /**
+     * Convert Arrays.toString() format back to byte array
+     * Converts "[1, 2, 3, -4, 5]" -> byte[] {1, 2, 3, -4, 5}
+     * @param arrayString String representation from Arrays.toString()
+     * @return byte array, or null if parsing fails
+     */
+    public static byte[] parseStringToByteArray(String arrayString) {
+        try {
+            // Remove brackets and whitespace
+            String cleaned = arrayString.trim();
+            if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+                cleaned = cleaned.substring(1, cleaned.length() - 1);
+            }
+
+            // Handle empty array
+            if (cleaned.isEmpty()) {
+                return new byte[0];
+            }
+
+            // Split by comma
+            String[] parts = cleaned.split(",");
+            byte[] result = new byte[parts.length];
+
+            // Parse each byte
+            for (int i = 0; i < parts.length; i++) {
+                result[i] = Byte.parseByte(parts[i].trim());
+            }
+
+            return result;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to parse string to byte array: " + e.getMessage());
+            return null;
         }
     }
 }

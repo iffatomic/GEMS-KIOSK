@@ -429,6 +429,21 @@ public class LoginActivity extends AppCompatActivity {
                 sdk.UF_Reconnect();
                 Log.d(TAG, "Scanner reconnected");
 
+                // Diagnostic: Check how many templates are in scanner memory
+                int[] numTemplates = new int[1];
+                UF_RET_CODE checkRet = sdk.UF_GetNumOfTemplate(numTemplates);
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ SCANNER TEMPLATE CHECK (Before Identify)");
+                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ UF_GetNumTemplate result: " + checkRet);
+                Log.d(TAG, "║ Templates in scanner: " + numTemplates[0]);
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                if (numTemplates[0] == 0) {
+                    Log.e(TAG, "⚠ WARNING: Scanner has 0 templates! UF_Save() may have failed.");
+                    Log.e(TAG, "⚠ Templates were not persisted to flash memory.");
+                }
+
                 mainHandler.post(() -> {
                     fingerprintInstruction.setText("Scanning fingerprint...");
                 });

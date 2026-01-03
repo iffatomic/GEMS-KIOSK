@@ -119,13 +119,13 @@ public class FingerprintDownloadApiUsageExample {
         Log.d(TAG, "      - Position: " + hand + " " + finger);
         Log.d(TAG, "      - Quality: " + fingerprint.getQuality() + "%");
         Log.d(TAG, "      - Template Size: " + (fingerprint.getTemplateData() != null
-                ? fingerprint.getTemplateData().length() + " chars (Base64)"
+                ? fingerprint.getTemplateData().length + " bytes (Raw)"
                 : "null"));
         Log.d(TAG, "      - Finger Type: " + fingerprint.getFingerType());
         Log.d(TAG, "      - Enrollment Date: " + fingerprint.getEnrollmentDate());
 
         // Here you would typically:
-        // 1. Decode Base64 template data to byte[]
+        // 1. Use raw byte[] template data directly (NO Base64 decode needed!)
         // 2. Enroll to local fingerprint scanner using SDK
         // 3. Store mapping in local database
         // Example:
