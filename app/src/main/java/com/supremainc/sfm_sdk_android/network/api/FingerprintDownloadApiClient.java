@@ -88,16 +88,13 @@ public class FingerprintDownloadApiClient {
                                 Log.d(TAG, "║ First Employee: " + firstEmployee.getFullName());
                                 if (firstEmployee.getFingerprints() != null && !firstEmployee.getFingerprints().isEmpty()) {
                                     AllEmployeesFingerprintsResponse.FingerprintData firstFp = firstEmployee.getFingerprints().get(0);
-                                    byte[] templateData = firstFp.getTemplateData();
-                                    Log.d(TAG, "║ First Fingerprint Template Data: " +
-                                        (templateData != null ? templateData.length + " bytes" : "NULL!"));
-                                    if (templateData != null && templateData.length > 0) {
-                                        // Show first few bytes
-                                        StringBuilder hex = new StringBuilder();
-                                        for (int i = 0; i < Math.min(16, templateData.length); i++) {
-                                            hex.append(String.format("%02X ", templateData[i]));
-                                        }
-                                        Log.d(TAG, "║ First 16 bytes: " + hex.toString());
+                                    String templateString = firstFp.getTemplateDataString();
+                                    Log.d(TAG, "║ First Fingerprint Template String: " +
+                                        (templateString != null ? templateString.length() + " chars" : "NULL!"));
+                                    if (templateString != null && !templateString.isEmpty()) {
+                                        // Show first 50 chars
+                                        Log.d(TAG, "║ First 50 chars: " +
+                                            templateString.substring(0, Math.min(50, templateString.length())));
                                     }
                                 } else {
                                     Log.e(TAG, "║ First employee has NO fingerprints!");

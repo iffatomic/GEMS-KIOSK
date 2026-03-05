@@ -36,7 +36,7 @@ public class ManualOverrideService {
 
     /**
      * Create manual override profile with time range
-     * @param doorId Door ID (1-7)
+     * @param variableName Controller variable name (e.g., "MAIN.SOFT_LOCK_A", "MAIN.SOFT_LOCK_B")
      * @param vaultName Human-readable vault name (e.g., "Main Vault", "Day Vault")
      * @param username Username of custodian
      * @param name Full name
@@ -48,7 +48,7 @@ public class ManualOverrideService {
      * @param callback Response callback
      */
     public void createOverrideProfile(
-            int doorId,
+            String variableName,
             String vaultName,
             String username,
             String name,
@@ -59,15 +59,7 @@ public class ManualOverrideService {
             String requestedBy,
             ManualOverrideCallback callback) {
 
-        Log.d(TAG, "Creating override profile for door: " + doorId + " (" + vaultName + ")");
-
-        // Map doorId to variableName
-        String variableName = mapDoorIdToVariableName(doorId);
-        if (variableName == null) {
-            Log.e(TAG, "Invalid door ID: " + doorId);
-            callback.onProfileError("Invalid door ID: " + doorId);
-            return;
-        }
+        Log.d(TAG, "Creating override profile for variable: " + variableName + " (" + vaultName + ")");
 
         // Create request
         CreateManualOverrideProfileRequest request = new CreateManualOverrideProfileRequest();
@@ -101,7 +93,7 @@ public class ManualOverrideService {
 
     /**
      * Create indefinite override profile (no end time)
-     * @param doorId Door ID
+     * @param variableName Controller variable name (e.g., "MAIN.SOFT_LOCK_A", "MAIN.SOFT_LOCK_B")
      * @param vaultName Human-readable vault name (e.g., "Main Vault", "Day Vault")
      * @param custodian1Name First custodian's full name
      * @param custodian2Name Second custodian's full name
@@ -111,7 +103,7 @@ public class ManualOverrideService {
      * @param callback Response callback
      */
     public void createIndefiniteOverrideProfile(
-            int doorId,
+            String variableName,
             String vaultName,
             String custodian1Name,
             String custodian2Name,
@@ -120,14 +112,8 @@ public class ManualOverrideService {
             String requestedBy,
             ManualOverrideCallback callback) {
 
-        Log.d(TAG, "Creating indefinite override profile for door: " + doorId + " (" + vaultName + ")");
+        Log.d(TAG, "Creating indefinite override profile for variable: " + variableName + " (" + vaultName + ")");
         Log.d(TAG, "Custodians: " + custodian1Name + ", " + custodian2Name + ", " + custodian3Name);
-
-        String variableName = mapDoorIdToVariableName(doorId);
-        if (variableName == null) {
-            callback.onProfileError("Invalid door ID: " + doorId);
-            return;
-        }
 
         CreateManualOverrideProfileRequest request = new CreateManualOverrideProfileRequest();
         request.setVariableName(variableName);

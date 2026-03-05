@@ -118,8 +118,8 @@ public class FingerprintDownloadApiUsageExample {
         Log.d(TAG, "    • Fingerprint ID: " + fingerprint.getId());
         Log.d(TAG, "      - Position: " + hand + " " + finger);
         Log.d(TAG, "      - Quality: " + fingerprint.getQuality() + "%");
-        Log.d(TAG, "      - Template Size: " + (fingerprint.getTemplateData() != null
-                ? fingerprint.getTemplateData().length + " bytes (Raw)"
+        Log.d(TAG, "      - Template String: " + (fingerprint.getTemplateDataString() != null
+                ? fingerprint.getTemplateDataString().length() + " chars"
                 : "null"));
         Log.d(TAG, "      - Finger Type: " + fingerprint.getFingerType());
         Log.d(TAG, "      - Enrollment Date: " + fingerprint.getEnrollmentDate());

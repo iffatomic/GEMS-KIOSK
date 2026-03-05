@@ -84,6 +84,9 @@ public class AllEmployeesFingerprintsResponse {
         @SerializedName("fullName")
         private String fullName;
 
+        @SerializedName("role")
+        private String role;
+
         @SerializedName("department")
         private String department;
 
@@ -138,6 +141,14 @@ public class AllEmployeesFingerprintsResponse {
 
         public void setFullName(String fullName) {
             this.fullName = fullName;
+        }
+
+        public String getRole() {
+            return role;
+        }
+
+        public void setRole(String role) {
+            this.role = role;
         }
 
         public String getDepartment() {
@@ -201,7 +212,10 @@ public class AllEmployeesFingerprintsResponse {
         private int employeeId;
 
         @SerializedName("templateData")
-        private byte[] templateData;  // Raw byte array fingerprint template (NO Base64!)
+        private String templateDataBase64;  // Base64 format (old, not used - kept for backwards compatibility)
+
+        @SerializedName("templateDataByteArraysString")
+        private String templateDataString;  // "[1, 2, 3, ...]" format from PAC_API - USE THIS!
 
         @SerializedName("leftRight")
         private int leftRight;  // 0 = Left, 1 = Right
@@ -239,12 +253,20 @@ public class AllEmployeesFingerprintsResponse {
             this.employeeId = employeeId;
         }
 
-        public byte[] getTemplateData() {
-            return templateData;
+        public String getTemplateDataBase64() {
+            return templateDataBase64;
         }
 
-        public void setTemplateData(byte[] templateData) {
-            this.templateData = templateData;
+        public void setTemplateDataBase64(String templateDataBase64) {
+            this.templateDataBase64 = templateDataBase64;
+        }
+
+        public String getTemplateDataString() {
+            return templateDataString;
+        }
+
+        public void setTemplateDataString(String templateDataString) {
+            this.templateDataString = templateDataString;
         }
 
         public int getLeftRight() {

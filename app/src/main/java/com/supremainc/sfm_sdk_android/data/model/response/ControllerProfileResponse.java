@@ -61,6 +61,9 @@ public class ControllerProfileResponse {
     @SerializedName("updatedAt")
     private String updatedAt;
 
+    @SerializedName("vaultInfo")
+    private VaultInfo vaultInfo;
+
     public ControllerProfileResponse() {
     }
 
@@ -184,6 +187,14 @@ public class ControllerProfileResponse {
 
     public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public VaultInfo getVaultInfo() {
+        return vaultInfo;
+    }
+
+    public void setVaultInfo(VaultInfo vaultInfo) {
+        this.vaultInfo = vaultInfo;
     }
 
     @Override

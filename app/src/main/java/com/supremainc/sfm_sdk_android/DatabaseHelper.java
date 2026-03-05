@@ -1666,14 +1666,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      * @param username Username
      * @param name Full name
      * @param role User role (ADMIN or CUSTODIAN)
-     * @param templateData Template as raw byte array (BLOB)
+     * @param templateDataString Template as Arrays.toString() format string (e.g., "[69, 27, 145, ...]")
      * @param leftRight 0 = Left, 1 = Right
      * @param fingerIndex Finger index 1-10
      * @param fingerType Finger type (Thumb, Index, etc.)
      * @return Scanner ID (integer) if successful, -1 if failed
      */
     public int insertOrUpdateSyncedFingerprint(String apiId, String employeeNumber, String username, String name,
-                                                 String role, byte[] templateData, int leftRight, int fingerIndex, String fingerType) {
+                                                 String role, String templateDataString, int leftRight, int fingerIndex, String fingerType) {
         SQLiteDatabase db = this.getWritableDatabase();
 
         // Check if this API ID already exists
@@ -1694,7 +1694,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             values.put(KEY_SYNCED_USERNAME, username);
             values.put(KEY_SYNCED_NAME, name);
             values.put(KEY_SYNCED_ROLE, role);
-            values.put(KEY_SYNCED_TEMPLATE_DATA, java.util.Arrays.toString(templateData));
+            values.put(KEY_SYNCED_TEMPLATE_DATA, templateDataString);  // Store original string directly (unsigned format)
             values.put(KEY_SYNCED_LEFT_RIGHT, leftRight);
             values.put(KEY_SYNCED_FINGER_INDEX, fingerIndex);
             values.put(KEY_SYNCED_FINGER_TYPE, fingerType);
@@ -1731,7 +1731,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             values.put(KEY_SYNCED_USERNAME, username);
             values.put(KEY_SYNCED_NAME, name);
             values.put(KEY_SYNCED_ROLE, role);
-            values.put(KEY_SYNCED_TEMPLATE_DATA, java.util.Arrays.toString(templateData));
+            values.put(KEY_SYNCED_TEMPLATE_DATA, templateDataString);  // Store original string directly (unsigned format)
             values.put(KEY_SYNCED_LEFT_RIGHT, leftRight);
             values.put(KEY_SYNCED_FINGER_INDEX, fingerIndex);
             values.put(KEY_SYNCED_FINGER_TYPE, fingerType);
@@ -1972,6 +1972,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
 
         return fingerprints;
+    }
+
+    /**
+     * Get a single synced user by employee number (returns first match)
+     * Used for employee ID verification in manual override
+     * @param employeeNumber The employee number to search for
+     * @return SyncedFingerprint object if found, null otherwise
+     */
+    public SyncedFingerprint getSyncedUserByEmployeeNumber(String employeeNumber) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        SyncedFingerprint syncedUser = null;
+
+        String query = "SELECT * FROM " + TABLE_SYNCED_FINGERPRINTS
+                + " WHERE " + KEY_SYNCED_EMPLOYEE_NUMBER + " = ? LIMIT 1";
+
+        Cursor cursor = db.rawQuery(query, new String[]{employeeNumber});
+
+        if (cursor.moveToFirst()) {
+            syncedUser = cursorToSyncedFingerprint(cursor);
+        }
+
+        cursor.close();
+        db.close();
+
+        return syncedUser;
     }
 
     /**
@@ -2591,13 +2616,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
+     * Convert byte array to unsigned format string (like API sends)
+     * Converts byte[] {69, 27, 14, 21, -111, ...} -> "[69, 27, 14, 21, 145, ...]"
+     *
+     * IMPORTANT: Outputs UNSIGNED representation (0-255), not Java's signed representation
+     * This matches the format from the PAC_API templateDataByteArraysString field
+     *
+     * @param bytes Byte array to convert
+     * @return String in unsigned format, or null if input is null
+     */
+    public static String byteArrayToUnsignedString(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        for (int i = 0; i < bytes.length; i++) {
+            // Convert signed byte to unsigned int (0-255)
+            int unsignedValue = bytes[i] & 0xFF;
+            sb.append(unsignedValue);
+            if (i < bytes.length - 1) {
+                sb.append(", ");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /**
      * Convert Arrays.toString() format back to byte array
-     * Converts "[1, 2, 3, -4, 5]" -> byte[] {1, 2, 3, -4, 5}
+     * Converts "[69, 29, 18, 24, 162, ...]" -> byte[] {69, 29, 18, 24, -94, ...}
+     *
+     * IMPORTANT: Uses Integer.parseInt() then casts to byte to handle unsigned byte values (0-255)
+     * Values > 127 become negative when cast to signed byte (e.g., 162 -> -94)
+     *
      * @param arrayString String representation from Arrays.toString()
      * @return byte array, or null if parsing fails
      */
     public static byte[] parseStringToByteArray(String arrayString) {
         try {
+            Log.d(TAG, "parseStringToByteArray: Input length = " + arrayString.length());
+
             // Remove brackets and whitespace
             String cleaned = arrayString.trim();
             if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
@@ -2611,16 +2671,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             // Split by comma
             String[] parts = cleaned.split(",");
+            Log.d(TAG, "parseStringToByteArray: Found " + parts.length + " parts");
+
             byte[] result = new byte[parts.length];
 
-            // Parse each byte
+            // Parse each byte (handles 0-255 range by parsing as int first)
             for (int i = 0; i < parts.length; i++) {
-                result[i] = Byte.parseByte(parts[i].trim());
+                int value = Integer.parseInt(parts[i].trim()); // 0-255
+                result[i] = (byte) value;                      // Cast to signed byte
+            }
+
+            Log.d(TAG, "parseStringToByteArray: Successfully parsed " + result.length + " bytes");
+
+            // Log first 20 bytes for debugging
+            if (result.length >= 20) {
+                StringBuilder hex = new StringBuilder();
+                for (int i = 0; i < 20; i++) {
+                    hex.append(String.format("%02X ", result[i]));
+                }
+                Log.d(TAG, "parseStringToByteArray: First 20 bytes (HEX) = " + hex.toString());
             }
 
             return result;
         } catch (Exception e) {
             Log.e(TAG, "Failed to parse string to byte array: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }

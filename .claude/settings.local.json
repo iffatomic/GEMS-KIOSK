@@ -5,7 +5,8 @@
       "Bash(grep:*)",
       "Bash(./gradlew :app:compileDebugJavaWithJavac:*)",
       "Bash(./gradlew assembleDebug:*)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "Bash(adb logcat:*)"
     ]
   }
 }

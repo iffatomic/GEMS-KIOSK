@@ -39,6 +39,7 @@ import com.supremainc.sfm_sdk_android.data.model.response.EnrollUserResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
 import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
+import com.supremainc.sfm_sdk_android.service.FingerprintAutoSyncService;
 
 import android.util.Base64;
 
@@ -106,6 +107,9 @@ public class MainMenuActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
+        // Hide system navigation bar for kiosk mode
+        hideSystemUI();
+
         // Initialize preferences
         languagePrefs = getSharedPreferences(LANGUAGE_PREF, MODE_PRIVATE);
         loginPrefs = getSharedPreferences(LOGIN_PREF, MODE_PRIVATE);
@@ -138,6 +142,13 @@ public class MainMenuActivity extends AppCompatActivity {
 
         // Start auto-refresh timer
         startDashboardAutoRefresh();
+
+        // Note: Fingerprint auto-sync service is already started in SplashActivity
+        // This ensures SignalR connection is active before user reaches MainMenu
+        // Calling startService again is safe - it will reuse existing service instance
+        Intent fingerprintSyncIntent = new Intent(this, FingerprintAutoSyncService.class);
+        startService(fingerprintSyncIntent);
+        Log.d(TAG, "Fingerprint Auto-Sync Service verified (started in SplashActivity)");
     }
 
     /**
@@ -1045,13 +1056,16 @@ public class MainMenuActivity extends AppCompatActivity {
             }
         }
 
-        // Close the scanner port - MainMenuActivity manages the scanner lifecycle
-        if (sdk != null) {
+        // IMPORTANT: Do NOT close scanner port here!
+        // Following PMOTamsNormal pattern - port stays open across activities
+        // Only cancel any active operations, don't close the port
+        // This prevents UF_ERR_CANNOT_WRITE_SERIAL when returning to LoginActivity
+        if (sdk != null && isScanning) {
             try {
-                sdk.UF_CloseCommPort();
-                Log.d(TAG, "Scanner port closed in MainMenuActivity onDestroy");
+                sdk.UF_Cancel(false);
+                Log.d(TAG, "Cancelled any active scanner operations");
             } catch (Exception e) {
-                Log.e(TAG, "Error closing scanner port", e);
+                Log.d(TAG, "No active operation to cancel");
             }
         }
 
@@ -1059,5 +1073,38 @@ public class MainMenuActivity extends AppCompatActivity {
         if (dbHelper != null) {
             dbHelper.close();
         }
+    }
+
+    /**
+     * Hide system navigation bar for kiosk mode
+     * User can still swipe up to show it, but it will hide again when window loses focus
+     */
+    private void hideSystemUI() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemUI();
+        }
+    }
+
+    /**
+     * Disable back button for kiosk mode
+     * Prevents users from exiting the app accidentally
+     */
+    @Override
+    public void onBackPressed() {
+        // Do nothing - disable back button in kiosk mode
+        // Users must use the proper exit/logout flow through the UI
+        Log.d(TAG, "Back button pressed - disabled in kiosk mode");
     }
 }

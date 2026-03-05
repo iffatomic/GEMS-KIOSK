@@ -36,7 +36,6 @@ public class SplashActivity extends AppCompatActivity {
 
     private static final String TAG = "SplashActivity";
 
-    private DatabaseHelper dbHelper;
     private StaffEnrollmentService staffEnrollmentService;
     private ImageView gemsLogo;
     private TextView gemsText;
@@ -45,6 +44,9 @@ public class SplashActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
+
+        // Hide system navigation bar for kiosk mode
+        hideSystemUI();
 
         // Initialize configuration from JSON (loads config.json and syncs to ApiConstants)
         // Using initialize() to use persisted config (allows user changes via SystemSettings)
@@ -56,10 +58,17 @@ public class SplashActivity extends AppCompatActivity {
         // Show API connection toast
         Toast.makeText(this, "Connecting to API: " + apiUrl, Toast.LENGTH_LONG).show();
 
-        // Initialize database helper
-        dbHelper = new DatabaseHelper(this);
+        // Start fingerprint auto-sync service EARLY (before user reaches MainMenu)
+        // This ensures SignalR is connected and listening for fingerprint enrollments
+        // throughout the entire app session, regardless of which screen user is on
+        Intent fingerprintSyncIntent = new Intent(this, FingerprintAutoSyncService.class);
+        startService(fingerprintSyncIntent);
+        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.d(TAG, "║ Fingerprint Auto-Sync Service started (from Splash)");
+        Log.d(TAG, "║ SignalR will remain active across all activities");
+        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-        // Initialize staff enrollment service for API verification
+        // Initialize staff enrollment service for API connectivity check
         staffEnrollmentService = new StaffEnrollmentService(this);
 
         // Get views
@@ -131,12 +140,12 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     /**
-     * Check API connectivity and navigate to MainMenuActivity
+     * Check API connectivity and navigate to LoginActivity
      *
      * SIMPLIFIED FLOW:
      * - Attempt to connect to PAC API
      * - Show connection status via Toast (success/failure)
-     * - Always navigate to MainMenuActivity regardless of result
+     * - Always navigate to LoginActivity for security
      */
     private void navigateToNextScreen() {
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
@@ -156,132 +165,73 @@ public class SplashActivity extends AppCompatActivity {
                     Log.d(TAG, "║ ✓ API CONNECTION SUCCESSFUL");
                     Log.d(TAG, "╠════════════════════════════════════════════════════════════");
                     Log.d(TAG, "║ Server responded successfully");
-                    Log.d(TAG, "║ Enrolled users found: " + (users != null ? users.size() : 0));
                     Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-                    // Check if there are any enrolled users
-                    boolean hasEnrolledUsers = users != null && !users.isEmpty();
+                    // Show success toast
+                    Toast.makeText(SplashActivity.this,
+                        "✓ API Connected Successfully",
+                        Toast.LENGTH_SHORT).show();
 
-                    if (hasEnrolledUsers) {
-                        // Show success toast
-                        Toast.makeText(SplashActivity.this,
-                            "✓ API Connected Successfully",
-                            Toast.LENGTH_SHORT).show();
-
-                        // Navigate to MainMenuActivity after short delay
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            startActivity(new Intent(SplashActivity.this, MainMenuActivity.class));
-                            finish();
-                        }, 500);
-                    } else {
-                        // No enrolled users - navigate to first-time setup
-                        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
-                        Log.d(TAG, "║ NO ENROLLED USERS FOUND - FIRST TIME SETUP REQUIRED");
-                        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
-
-                        Toast.makeText(SplashActivity.this,
-                            "No enrolled users found. Please login...",
-                            Toast.LENGTH_LONG).show();
-
-                        // Navigate to LoginActivity (GEMS Original - no local enrollment)
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
-                            startActivity(intent);
-                            finish();
-                        }, 1000);
-                    }
+                    // SECURITY: Always navigate to LoginActivity for authentication
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }, 500);
                 });
             }
 
             @Override
             public void onEnrollmentError(String error) {
-                // API connection failed - check local database for enrolled users
+                // API connection failed
                 runOnUiThread(() -> {
                     Log.w(TAG, "╔════════════════════════════════════════════════════════════");
                     Log.w(TAG, "║ ✗ API CONNECTION FAILED");
                     Log.w(TAG, "╠════════════════════════════════════════════════════════════");
                     Log.w(TAG, "║ Error: " + error);
-                    Log.w(TAG, "║ Checking local database for enrolled users...");
+                    Log.w(TAG, "║ Will proceed with local data if available");
                     Log.w(TAG, "╚════════════════════════════════════════════════════════════");
 
-                    // Check if there are any enrolled users in local database
-                    boolean hasLocalUsers = dbHelper.hasAnyEnrolledUsers();
+                    // Show failure toast
+                    Toast.makeText(SplashActivity.this,
+                        "✗ API Connection Failed\nProceeding with local data...",
+                        Toast.LENGTH_LONG).show();
 
-                    if (hasLocalUsers) {
-                        // Has local users - proceed to MainMenu
-                        Log.w(TAG, "║ Found enrolled users in local database");
-                        Log.w(TAG, "║ Proceeding to MainMenu...");
-
-                        Toast.makeText(SplashActivity.this,
-                            "✗ API Connection Failed\nProceeding with local data...",
-                            Toast.LENGTH_LONG).show();
-
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            startActivity(new Intent(SplashActivity.this, MainMenuActivity.class));
-                            finish();
-                        }, 1000);
-                    } else {
-                        // No local users - navigate to login
-                        Log.w(TAG, "║ No enrolled users found");
-                        Log.w(TAG, "║ Navigating to login...");
-
-                        Toast.makeText(SplashActivity.this,
-                            "No enrolled users found. Please login...",
-                            Toast.LENGTH_LONG).show();
-
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
-                            startActivity(intent);
-                            finish();
-                        }, 1000);
-                    }
+                    // Navigate to LoginActivity (will use local data if available)
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }, 1000);
                 });
             }
 
             @Override
-            public void onEnrollmentSuccess(com.supremainc.sfm_sdk_android.data.model.response.EnrollUserResponse response) {
-                // Not used in this context
-            }
+            public void onEnrollmentSuccess(com.supremainc.sfm_sdk_android.data.model.response.EnrollUserResponse response) { }
 
             @Override
-            public void onUserValidated(UserListItem user) {
-                // Not used in this context
-            }
+            public void onUserValidated(UserListItem user) { }
 
             @Override
-            public void onUserNotFound() {
-                // Not used in this context
-            }
+            public void onUserNotFound() { }
 
             @Override
-            public void onUserDeleted() {
-                // Not used in this context
-            }
+            public void onUserDeleted() { }
 
             @Override
-            public void onFingerprintValidated(UserListItem user) {
-                // Not used in this context
-            }
+            public void onFingerprintValidated(UserListItem user) { }
 
             @Override
-            public void onFingerprintNotFound() {
-                // Not used in this context
-            }
+            public void onFingerprintNotFound() { }
 
             @Override
-            public void onSyncStarted(int totalFingerprints) {
-                // Not used in this context
-            }
+            public void onSyncStarted(int totalFingerprints) { }
 
             @Override
-            public void onSyncProgress(int current, int total, String userName) {
-                // Not used in this context
-            }
+            public void onSyncProgress(int current, int total, String userName) { }
 
             @Override
-            public void onSyncCompleted(int successCount, int failCount) {
-                // Not used in this context
-            }
+            public void onSyncCompleted(int successCount, int failCount) { }
         });
     }
 
@@ -302,14 +252,20 @@ public class SplashActivity extends AppCompatActivity {
             SFM_SDK_ANDROID sdk = null;
 
             // Step 1: Reset database
+            DatabaseHelper dbHelper = null;
             try {
                 Log.d(TAG, "║ Resetting database...");
+                dbHelper = new DatabaseHelper(SplashActivity.this);
                 dbHelper.resetDatabase();
                 databaseReset = true;
                 Log.d(TAG, "║ ✓ Database reset successful");
             } catch (Exception e) {
                 Log.e(TAG, "║ ✗ Database reset failed", e);
                 errorMessage = "Database reset failed: " + e.getMessage();
+            } finally {
+                if (dbHelper != null) {
+                    dbHelper.close();
+                }
             }
 
             // Step 2: Clear scanner memory
@@ -424,11 +380,31 @@ public class SplashActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Hide system navigation bar for kiosk mode
+     * User can still swipe up to show it, but it will hide again when window loses focus
+     */
+    private void hideSystemUI() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemUI();
+        }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (dbHelper != null) {
-            dbHelper.close();
-        }
+        // Cleanup if needed
     }
 }

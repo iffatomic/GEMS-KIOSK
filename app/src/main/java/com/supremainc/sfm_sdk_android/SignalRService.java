@@ -57,7 +57,17 @@ public class SignalRService {
         this.eventListener = listener;
 
         String hubUrl = getHubUrl();
-        Log.i(TAG, "Initializing SignalR connection to: " + hubUrl);
+
+        // Enhanced logging to show exactly what URL is being used
+        Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.i(TAG, "║ SIGNALR CONNECTION INITIALIZATION");
+        Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+        Log.i(TAG, "║ Hub URL: " + hubUrl);
+        Log.i(TAG, "║ Source: " + (context != null ? "Config (from config.json)" : "Fallback (hardcoded)"));
+        if (context != null) {
+            Log.i(TAG, "║ Base URL: " + ApiConstants.getBaseUrl(context));
+        }
+        Log.i(TAG, "╚════════════════════════════════════════════════════════════");
 
         // Simple connection without auto-reconnect
         hubConnection = HubConnectionBuilder.create(hubUrl)
@@ -263,7 +273,16 @@ public class SignalRService {
                     Log.e(TAG, "✗ SignalR connection failed: " + error.getMessage(), error);
                     callback.onError(error.getMessage());
                 })
-                .subscribe();
+                .subscribe(
+                        () -> {
+                            // onComplete - already handled by doOnComplete
+                        },
+                        error -> {
+                            // onError handler - prevents OnErrorNotImplementedException crash
+                            Log.e(TAG, "Unhandled SignalR subscription error: " + error.getMessage(), error);
+                            // Error already reported via doOnError callback
+                        }
+                );
     }
 
     /**

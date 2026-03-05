@@ -5,16 +5,21 @@
 
 package com.supremainc.sfm_sdk_android;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,6 +28,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.supremainc.sfm_sdk_android.data.model.response.ControllerProfileResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
+import com.supremainc.sfm_sdk_android.data.model.response.VaultInfo;
 import com.supremainc.sfm_sdk_android.network.api.ControllerProfileApiClient;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.ManualOverrideCallback;
@@ -36,6 +42,7 @@ import android.app.AlertDialog;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -69,29 +76,39 @@ public class ManualOverrideActivity extends AppCompatActivity {
     private LinearLayout step3Container;
     private LinearLayout step4Container;
     private LinearLayout step5Container;
+    private LinearLayout step6Container;
 
-    // Step 1: Vault Type Selection
+    // Step 1: Employee ID Input
+    private EditText etEmployeeId;
+    private Button btnProceedToFingerprint;
+
+    // Step 2: Fingerprint Authentication
+    private TextView tvEmployeeIdDisplay;
+    private ImageView ivFingerprintIcon;
+    private TextView tvFingerprintStatus;
+    private LinearLayout verifiedEmployeeContainer;
+    private TextView tvVerifiedEmployeeName;
+    private TextView tvVerifiedEmployeeId;
+    private ProgressBar fingerprintProgress;
+    private Button btnScanFingerprint;
+    private Button btnProceedToVaultSelection;
+    private Button btnBackToEmployeeId;
+
+    // Step 3: Vault/Door Selection
+    private Spinner spinnerVaultCategory;
     private Button btnMainVault;
     private Button btnDayVault;
     private LinearLayout vaultButtonContainer;
 
-    // Step 2: Entry Point Selection
-    private TextView tvSelectedVault;
-    private Button btnMainGrill;
-    private Button btnCompartment1;
-    private Button btnCompartment2;
-    private Button btnCompartment3;
-    private Button btnBackToStep1;
-
-    // Step 3: Time Frame Selection (NEW for GEMS Original)
+    // Step 4: Time Frame Selection
     private TextView tvTimeFrameVaultDisplay;
     private TextView tvStartTime;
     private Button btnSelectEndTime;
     private TextView tvSelectedEndTime;
-    private Button btnBackToStep2;
+    private Button btnBackToStep3;
     private Button btnProceedToVerification;
 
-    // Step 4: Key Switch Monitoring (NEW)
+    // Step 5: Key Switch Monitoring
     private TextView tvKeySwitchVaultName;
     private TextView tvKeySwitchInstructions;
     private LinearLayout keySwitch1Container, keySwitch2Container, keySwitch3Container;
@@ -101,7 +118,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
     private Button btnCancelKeySwitch;
     private TextView tvKeySwitchWaitingMessage;
 
-    // Step 5: Result
+    // Step 6: Result
     private ImageView ivResultIcon;
     private TextView tvResultTitle;
     private TextView tvResultDescription;
@@ -120,7 +137,16 @@ public class ManualOverrideActivity extends AppCompatActivity {
     private boolean keySwitch1On = false;
     private boolean keySwitch2On = false;
     private boolean keySwitch3On = false;
-    private int selectedDoorId = -1;  // Track which door we're monitoring
+    private String selectedDoorName = null;  // Track which door we're monitoring (by door name)
+
+    // Fingerprint authentication state
+    private boolean isFingerprintVerified = false;
+    private boolean isScanning = false;
+    private String enteredEmployeeId = "";  // Store entered employee ID from Step 1
+    private DatabaseHelper.User expectedUser = null;  // Expected user based on entered employee ID (from users table)
+    private DatabaseHelper.SyncedFingerprint expectedSyncedUser = null;  // Expected user based on entered employee ID (from synced_fingerprints table)
+    private DatabaseHelper.User verifiedUser = null;  // Stores verified employee from users table (after fingerprint match)
+    private DatabaseHelper.SyncedFingerprint verifiedSyncedUser = null;  // Stores verified employee from synced_fingerprints table (after fingerprint match)
 
     // Database and SDK
     private DatabaseHelper dbHelper;
@@ -153,6 +179,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
         mainHandler = new Handler(Looper.getMainLooper());
         manualOverrideService = new ManualOverrideService(this);
         controllerProfileApiClient = new ControllerProfileApiClient(this);
+
+        // Initialize SDK (reuse from MainMenuActivity - scanner already initialized)
+        sdk = new SFM_SDK_ANDROID();
 
         // Initialize SignalR for key switch monitoring (NEW)
         initializeSignalR();
@@ -210,8 +239,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
             public void onError(String errorMessage) {
                 Log.e(TAG, "✗ SignalR connection failed: " + errorMessage);
                 runOnUiThread(() -> {
+                    String userMessage = "⚠ Cannot connect to API\nReal-time monitoring unavailable";
                     Toast.makeText(ManualOverrideActivity.this,
-                        "Failed to connect to event system: " + errorMessage,
+                        userMessage,
                         Toast.LENGTH_LONG).show();
                 });
             }
@@ -232,29 +262,39 @@ public class ManualOverrideActivity extends AppCompatActivity {
         step3Container = findViewById(R.id.step3Container);
         step4Container = findViewById(R.id.step4Container);
         step5Container = findViewById(R.id.step5Container);
+        step6Container = findViewById(R.id.step6Container);
 
-        // Step 1
+        // Step 1: Employee ID Input
+        etEmployeeId = findViewById(R.id.etEmployeeId);
+        btnProceedToFingerprint = findViewById(R.id.btnProceedToFingerprint);
+
+        // Step 2: Fingerprint Authentication
+        tvEmployeeIdDisplay = findViewById(R.id.tvEmployeeIdDisplay);
+        ivFingerprintIcon = findViewById(R.id.ivFingerprintIcon);
+        tvFingerprintStatus = findViewById(R.id.tvFingerprintStatus);
+        verifiedEmployeeContainer = findViewById(R.id.verifiedEmployeeContainer);
+        tvVerifiedEmployeeName = findViewById(R.id.tvVerifiedEmployeeName);
+        tvVerifiedEmployeeId = findViewById(R.id.tvVerifiedEmployeeId);
+        fingerprintProgress = findViewById(R.id.fingerprintProgress);
+        btnScanFingerprint = findViewById(R.id.btnScanFingerprint);
+        btnProceedToVaultSelection = findViewById(R.id.btnProceedToVaultSelection);
+        btnBackToEmployeeId = findViewById(R.id.btnBackToEmployeeId);
+
+        // Step 3: Vault/Door Selection
+        spinnerVaultCategory = findViewById(R.id.spinnerVaultCategory);
         btnMainVault = findViewById(R.id.btnMainVault);
         btnDayVault = findViewById(R.id.btnDayVault);
         vaultButtonContainer = findViewById(R.id.vaultButtonContainer);
 
-        // Step 2
-        tvSelectedVault = findViewById(R.id.tvSelectedVault);
-        btnMainGrill = findViewById(R.id.btnMainGrill);
-        btnCompartment1 = findViewById(R.id.btnCompartment1);
-        btnCompartment2 = findViewById(R.id.btnCompartment2);
-        btnCompartment3 = findViewById(R.id.btnCompartment3);
-        btnBackToStep1 = findViewById(R.id.btnBackToStep1);
-
-        // Step 3: Time Frame Selection (NEW for GEMS Original)
+        // Step 4: Time Frame Selection
         tvTimeFrameVaultDisplay = findViewById(R.id.tvTimeFrameVaultDisplay);
         tvStartTime = findViewById(R.id.tvStartTime);
         btnSelectEndTime = findViewById(R.id.btnSelectEndTime);
         tvSelectedEndTime = findViewById(R.id.tvSelectedEndTime);
-        btnBackToStep2 = findViewById(R.id.btnBackToStep2);
+        btnBackToStep3 = findViewById(R.id.btnBackToStep3);
         btnProceedToVerification = findViewById(R.id.btnProceedToVerification);
 
-        // Step 4: Key Switch Monitoring (NEW)
+        // Step 5: Key Switch Monitoring
         tvKeySwitchVaultName = findViewById(R.id.tvKeySwitchVaultName);
         tvKeySwitchInstructions = findViewById(R.id.tvKeySwitchInstructions);
         keySwitch1Container = findViewById(R.id.keySwitch1Container);
@@ -270,7 +310,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
         btnCancelKeySwitch = findViewById(R.id.btnCancelKeySwitch);
         tvKeySwitchWaitingMessage = findViewById(R.id.tvKeySwitchWaitingMessage);
 
-        // Step 5: Result
+        // Step 6: Result
         ivResultIcon = findViewById(R.id.ivResultIcon);
         tvResultTitle = findViewById(R.id.tvResultTitle);
         tvResultDescription = findViewById(R.id.tvResultDescription);
@@ -281,13 +321,37 @@ public class ManualOverrideActivity extends AppCompatActivity {
     private void setupListeners() {
         backButton.setOnClickListener(v -> onBackPressed());
 
-        // Step 1: Vault/Door Selection - buttons are created dynamically in populateVaultButtons()
+        // Step 1: Employee ID Input
+        btnProceedToFingerprint.setOnClickListener(v -> {
+            String employeeId = etEmployeeId.getText().toString().trim();
+            if (employeeId.isEmpty()) {
+                Toast.makeText(this, "Please enter your employee ID", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-        // Step 2: Entry Point Selection - REMOVED (no longer needed)
-        // Each vault/door selection from API already represents a specific door
+            // Verify employee ID exists in database
+            verifyEmployeeIdExists(employeeId);
+        });
 
-        // Step 3: Time Frame Selection
-        btnBackToStep2.setOnClickListener(v -> showStep(1));  // Go back to step 1 (vault selection)
+        // Step 2: Fingerprint Authentication
+        btnScanFingerprint.setOnClickListener(v -> startFingerprintScan());
+        btnProceedToVaultSelection.setOnClickListener(v -> {
+            if (isFingerprintVerified) {
+                showStep(3);  // Proceed to vault selection
+            } else {
+                Toast.makeText(this, "Please verify your fingerprint first", Toast.LENGTH_SHORT).show();
+            }
+        });
+        btnBackToEmployeeId.setOnClickListener(v -> {
+            // Reset all employee verification state when going back to Step 1
+            resetEmployeeVerificationState();
+            showStep(1);
+        });
+
+        // Step 3: Vault/Door Selection - buttons are created dynamically in populateVaultButtons()
+
+        // Step 4: Time Frame Selection
+        btnBackToStep3.setOnClickListener(v -> showStep(3));  // Go back to vault selection
 
         btnSelectEndTime.setOnClickListener(v -> showDateTimePicker());
 
@@ -302,11 +366,58 @@ public class ManualOverrideActivity extends AppCompatActivity {
             createOverrideProfileWithTimeFrame();
         });
 
-        // Step 4: Key Switch Monitoring
+        // Step 5: Key Switch Monitoring
         btnCancelKeySwitch.setOnClickListener(v -> finish());
 
-        // Step 5: Done
+        // Step 6: Done
         btnDone.setOnClickListener(v -> finish());
+    }
+
+    // =================== EMPLOYEE ID VERIFICATION ===================
+
+    /**
+     * Verify that the entered employee ID exists in the database
+     * Searches both users table and synced_fingerprints table
+     */
+    private void verifyEmployeeIdExists(String employeeId) {
+        Log.d(TAG, "Verifying employee ID: " + employeeId);
+
+        // Search in users table first (by staffId)
+        DatabaseHelper.User user = dbHelper.getUserByStaffId(employeeId);
+
+        // If not found in users table, search in synced_fingerprints table (by employeeNumber)
+        DatabaseHelper.SyncedFingerprint syncedUser = null;
+        if (user == null) {
+            syncedUser = dbHelper.getSyncedUserByEmployeeNumber(employeeId);
+        }
+
+        if (user != null) {
+            // Employee ID found in users table
+            enteredEmployeeId = employeeId;
+            expectedUser = user;
+            expectedSyncedUser = null;
+
+            Log.i(TAG, "✓ Employee ID verified: " + user.getName() + " (Staff ID: " + user.getStaffId() + ")");
+            Toast.makeText(this, "Employee ID verified: " + user.getName(), Toast.LENGTH_SHORT).show();
+
+            showStep(2);  // Proceed to fingerprint authentication
+
+        } else if (syncedUser != null) {
+            // Employee ID found in synced_fingerprints table
+            enteredEmployeeId = employeeId;
+            expectedUser = null;
+            expectedSyncedUser = syncedUser;
+
+            Log.i(TAG, "✓ Employee ID verified: " + syncedUser.getName() + " (Employee Number: " + syncedUser.getEmployeeNumber() + ")");
+            Toast.makeText(this, "Employee ID verified: " + syncedUser.getName(), Toast.LENGTH_SHORT).show();
+
+            showStep(2);  // Proceed to fingerprint authentication
+
+        } else {
+            // Employee ID not found
+            Log.w(TAG, "✗ Employee ID not found: " + employeeId);
+            Toast.makeText(this, "Employee ID not found!\nPlease check your employee ID and try again.", Toast.LENGTH_LONG).show();
+        }
     }
 
     // =================== VAULT LOADING FROM API ===================
@@ -330,7 +441,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
                         return;
                     }
                     try {
-                        populateVaultButtons(profiles);
+                        setupCategorySpinner(profiles);
                     } catch (Exception e) {
                         Log.e(TAG, "Error updating UI", e);
                     }
@@ -346,9 +457,10 @@ public class ManualOverrideActivity extends AppCompatActivity {
                         return;
                     }
                     try {
+                        String userMessage = "⚠ Cannot connect to API\nPlease check network connection";
                         Toast.makeText(ManualOverrideActivity.this,
-                            "Failed to load vaults: " + error,
-                            Toast.LENGTH_SHORT).show();
+                            userMessage,
+                            Toast.LENGTH_LONG).show();
                         // Fall back to showing hardcoded buttons if API fails
                         showFallbackVaultButtons();
                     } catch (Exception e) {
@@ -383,6 +495,79 @@ public class ManualOverrideActivity extends AppCompatActivity {
     }
 
     /**
+     * Set up the vault category Spinner based on categories found in the loaded profiles.
+     * When a category is selected, the vault buttons below are filtered accordingly.
+     * Falls back gracefully if profiles are empty or have no category data.
+     */
+    private void setupCategorySpinner(List<ControllerProfileResponse> profiles) {
+        if (profiles == null || profiles.isEmpty()) {
+            spinnerVaultCategory.setVisibility(View.GONE);
+            showFallbackVaultButtons();
+            return;
+        }
+
+        // Collect distinct categories from vaultInfo, preserving insertion order
+        LinkedHashSet<String> categoriesSet = new LinkedHashSet<>();
+        for (ControllerProfileResponse profile : profiles) {
+            VaultInfo info = profile.getVaultInfo();
+            if (info != null && info.getVaultCategory() != null && !info.getVaultCategory().isEmpty()) {
+                categoriesSet.add(info.getVaultCategory());
+            }
+        }
+
+        if (categoriesSet.isEmpty()) {
+            // No category data from API — show all vaults directly without the spinner
+            spinnerVaultCategory.setVisibility(View.GONE);
+            populateVaultButtons(profiles);
+            return;
+        }
+
+        spinnerVaultCategory.setVisibility(View.VISIBLE);
+
+        List<String> categories = new ArrayList<>();
+        categories.add("-- Select Vault Category --");
+        categories.addAll(categoriesSet);
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, categories);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerVaultCategory.setAdapter(adapter);
+
+        spinnerVaultCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position == 0) {
+                    // Prompt row — clear vault buttons until a real category is chosen
+                    vaultButtonContainer.removeAllViews();
+                    return;
+                }
+
+                String selectedCategory = categories.get(position);
+                Log.d(TAG, "Vault category selected: " + selectedCategory);
+
+                List<ControllerProfileResponse> filtered = new ArrayList<>();
+                for (ControllerProfileResponse profile : profiles) {
+                    VaultInfo info = profile.getVaultInfo();
+                    if (info != null && selectedCategory.equals(info.getVaultCategory())) {
+                        filtered.add(profile);
+                    }
+                }
+
+                Log.d(TAG, "Filtered vaults for '" + selectedCategory + "': " + filtered.size());
+                populateVaultButtons(filtered);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                vaultButtonContainer.removeAllViews();
+            }
+        });
+
+        // Clear buttons until the user picks a category
+        vaultButtonContainer.removeAllViews();
+    }
+
+    /**
      * Create a door button with proper styling
      * Each button represents a specific door (ControllerProfile)
      */
@@ -409,19 +594,19 @@ public class ManualOverrideActivity extends AppCompatActivity {
         button.setBackgroundTintList(getResources().getColorStateList(R.color.buttonBackground));
         button.setAllCaps(false);
 
-        // Set click listener - go directly to confirmation (step 3)
+        // Set click listener - proceed to time frame selection (step 4)
         button.setOnClickListener(v -> {
             // Check if this door already has an active override
             if (isDoorAlreadyActivated(profile)) {
-                Toast.makeText(this, displayName + " is already activated!\nPlease deactivate it first before creating a new override.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "This door has already been overridden.\nPlease deactivate it first.", Toast.LENGTH_LONG).show();
                 return;
             }
 
             selectedProfile = profile;
             Log.d(TAG, "Selected door: " + displayName + " (Variable: " + profile.getControllerVariableName() + ")");
 
-            // Skip directly to confirmation (step 3)
-            showStep(3);
+            // Proceed to time frame selection (step 4)
+            showStep(4);
         });
 
         return button;
@@ -440,14 +625,17 @@ public class ManualOverrideActivity extends AppCompatActivity {
      * Check if a door already has an active override
      */
     private boolean isDoorAlreadyActivated(ControllerProfileResponse profile) {
-        if (profile == null || profile.getControllerVariableName() == null) {
+        if (profile == null) {
             return false;
         }
 
-        // You can check against local database or API if needed
-        // For now, we'll return false to allow activation
-        // TODO: Implement check against active overrides
-        return false;
+        // Use vaultName to check against VaultOverrideManager
+        String vaultName = profile.getVaultName() != null && !profile.getVaultName().isEmpty()
+                ? profile.getVaultName()
+                : profile.getControllerVariableName();
+
+        VaultOverrideManager manager = VaultOverrideManager.getInstance(this);
+        return manager.isVaultOverridden(vaultName);
     }
 
     /**
@@ -474,33 +662,36 @@ public class ManualOverrideActivity extends AppCompatActivity {
         step3Container.setVisibility(View.GONE);
         step4Container.setVisibility(View.GONE);
         step5Container.setVisibility(View.GONE);
+        step6Container.setVisibility(View.GONE);
 
-        // Map internal step numbers to display step numbers (skip step 2)
-        // Internal: 1, 3, 4, 5 → Display: 1, 2, 3, 4
-        int displayStepNumber;
-        switch (step) {
-            case 1: displayStepNumber = 1; break;
-            case 3: displayStepNumber = 2; break;
-            case 4: displayStepNumber = 3; break;
-            case 5: displayStepNumber = 4; break;
-            default: displayStepNumber = step; break;
-        }
-        stepNumber.setText(String.valueOf(displayStepNumber));
+        // All steps are sequential: 1, 2, 3, 4, 5, 6
+        stepNumber.setText(String.valueOf(step));
 
         switch (step) {
             case 1:
-                stepDescription.setText("Select Vault");
+                stepDescription.setText("Enter Employee ID");
                 step1Container.setVisibility(View.VISIBLE);
                 break;
 
             case 2:
-                // Step 2 removed - skip to step 3 directly
-                showStep(3);
+                stepDescription.setText("Authenticate");
+                step2Container.setVisibility(View.VISIBLE);
+
+                // Display entered employee ID
+                tvEmployeeIdDisplay.setText("Employee ID: " + enteredEmployeeId);
+
+                // Reset fingerprint state when showing this step
+                resetFingerprintState();
                 break;
 
             case 3:
-                stepDescription.setText("Set Time Frame");
+                stepDescription.setText("Select Vault");
                 step3Container.setVisibility(View.VISIBLE);
+                break;
+
+            case 4:
+                stepDescription.setText("Set Time Frame");
+                step4Container.setVisibility(View.VISIBLE);
 
                 // Display selected vault
                 tvTimeFrameVaultDisplay.setText(getDoorDisplayName());
@@ -516,9 +707,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 btnProceedToVerification.setEnabled(false);
                 break;
 
-            case 4:
+            case 5:
                 stepDescription.setText("Turn Key Switches");
-                step4Container.setVisibility(View.VISIBLE);
+                step5Container.setVisibility(View.VISIBLE);
 
                 // Display vault name
                 tvKeySwitchVaultName.setText(getDoorDisplayName());
@@ -531,9 +722,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 // Initialize key switch UI
                 resetKeySwitchUI();
 
-                // Extract door ID for event filtering
-                selectedDoorId = extractDoorIdFromProfile(selectedProfile);
-                Log.d(TAG, "Monitoring key switches for Door ID: " + selectedDoorId);
+                // Store door name for event filtering
+                selectedDoorName = selectedProfile.getVaultName();
+                Log.d(TAG, "Monitoring key switches for Door: " + selectedDoorName);
 
                 // Show waiting message
                 keySwitchProgress.setVisibility(View.VISIBLE);
@@ -541,9 +732,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 tvKeySwitchWaitingMessage.setText("Waiting for key switches to be turned...");
                 break;
 
-            case 5:
+            case 6:
                 stepDescription.setText("Complete");
-                step5Container.setVisibility(View.VISIBLE);
+                step6Container.setVisibility(View.VISIBLE);
                 break;
         }
     }
@@ -567,22 +758,22 @@ public class ManualOverrideActivity extends AppCompatActivity {
         // Key Switch 1
         tvKeySwitch1Status.setText("OFF - Waiting...");
         tvKeySwitch1Status.setTextColor(getResources().getColor(R.color.textSecondary));
-        ivKeySwitch1Icon.setAlpha(0.3f);
-        ivKeySwitch1Icon.setColorFilter(getResources().getColor(android.R.color.holo_red_dark));
+        ivKeySwitch1Icon.setAlpha(1.0f);
+        ivKeySwitch1Icon.setColorFilter(getResources().getColor(android.R.color.holo_red_light));
         keySwitch1Container.setBackgroundColor(0x40FF0000); // Red tint
 
         // Key Switch 2
         tvKeySwitch2Status.setText("OFF - Waiting...");
         tvKeySwitch2Status.setTextColor(getResources().getColor(R.color.textSecondary));
-        ivKeySwitch2Icon.setAlpha(0.3f);
-        ivKeySwitch2Icon.setColorFilter(getResources().getColor(android.R.color.holo_red_dark));
+        ivKeySwitch2Icon.setAlpha(1.0f);
+        ivKeySwitch2Icon.setColorFilter(getResources().getColor(android.R.color.holo_red_light));
         keySwitch2Container.setBackgroundColor(0x40FF0000); // Red tint
 
         // Key Switch 3
         tvKeySwitch3Status.setText("OFF - Waiting...");
         tvKeySwitch3Status.setTextColor(getResources().getColor(R.color.textSecondary));
-        ivKeySwitch3Icon.setAlpha(0.3f);
-        ivKeySwitch3Icon.setColorFilter(getResources().getColor(android.R.color.holo_red_dark));
+        ivKeySwitch3Icon.setAlpha(1.0f);
+        ivKeySwitch3Icon.setColorFilter(getResources().getColor(android.R.color.holo_red_light));
         keySwitch3Container.setBackgroundColor(0x40FF0000); // Red tint
     }
 
@@ -590,9 +781,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
      * Handle individual key switch event from SignalR
      */
     private void handleKeySwitchEvent(com.supremainc.sfm_sdk_android.dto.signalr.KeySwitchEventDto event) {
-        // Filter by door ID - only process events for the selected vault
-        if (event.getDoorId() != selectedDoorId) {
-            Log.d(TAG, "Ignoring key switch event for different door: " + event.getDoorId());
+        // Filter by door name - only process events for the selected vault
+        if (selectedDoorName == null || !selectedDoorName.equals(event.getDoorName())) {
+            Log.d(TAG, "Ignoring key switch event for different door: " + event.getDoorName());
             return;
         }
 
@@ -630,8 +821,8 @@ public class ManualOverrideActivity extends AppCompatActivity {
      * Handle aggregate key switch event (all ON or all OFF)
      */
     private void handleKeySwitchAggregateEvent(com.supremainc.sfm_sdk_android.dto.signalr.KeySwitchAggregateEventDto event) {
-        // Filter by door ID
-        if (event.getDoorId() != selectedDoorId) {
+        // Filter by door name
+        if (selectedDoorName == null || !selectedDoorName.equals(event.getDoorName())) {
             return;
         }
 
@@ -705,8 +896,8 @@ public class ManualOverrideActivity extends AppCompatActivity {
             // Switch is OFF - red
             statusText.setText("OFF - Waiting...");
             statusText.setTextColor(getResources().getColor(R.color.textSecondary));
-            icon.setAlpha(0.3f);
-            icon.setColorFilter(getResources().getColor(android.R.color.holo_red_dark));
+            icon.setAlpha(1.0f);
+            icon.setColorFilter(getResources().getColor(android.R.color.holo_red_light));
             container.setBackgroundColor(0x40FF0000);
             Log.i(TAG, "Key Switch " + switchNumber + " turned OFF");
         }
@@ -766,21 +957,10 @@ public class ManualOverrideActivity extends AppCompatActivity {
         Log.d(TAG, "║ API-FIRST OVERRIDE ACTIVATION");
         Log.d(TAG, "╠═══════════════════════════════════════════");
         Log.d(TAG, "║ Door: " + getDoorDisplayName());
-        Log.d(TAG, "║ Controller Variable: " + selectedProfile.getControllerVariableName());
 
-        // Extract door ID from controller variable name (e.g., "MAIN.SOFT_LOCK_A" -> extract door letter)
-        int doorId = extractDoorIdFromProfile(selectedProfile);
-        if (doorId == -1) {
-            Log.e(TAG, "║ ERROR: Could not determine door ID from profile");
-            Log.d(TAG, "╚═══════════════════════════════════════════");
-            runOnUiThread(() -> {
-                keySwitchProgress.setVisibility(View.GONE);
-                showFailureResult("Invalid door configuration");
-            });
-            return;
-        }
-
-        Log.d(TAG, "║ Door ID: " + doorId);
+        // Use controller variable name directly (e.g., "MAIN.SOFT_LOCK_A")
+        String variableName = selectedProfile.getControllerVariableName();
+        Log.d(TAG, "║ Controller Variable: " + variableName);
 
         ManualOverrideService service = new ManualOverrideService(this);
 
@@ -801,7 +981,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
         String custodianPlaceholder = "Key Switch Authorized";
 
         service.createIndefiniteOverrideProfile(
-                doorId,
+                variableName,                   // Controller variable name (e.g., "MAIN.SOFT_LOCK_A")
                 vaultName,                      // vaultName
                 custodianPlaceholder,           // custodian1 name (placeholder)
                 custodianPlaceholder,           // custodian2 name (placeholder)
@@ -925,6 +1105,11 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 case "E": return 5;
                 case "F": return 6;
                 case "G": return 7;
+                case "H": return 8;
+                case "I": return 9;
+                case "J": return 10;
+                case "K": return 11;
+                case "L": return 12;
                 default:
                     Log.w(TAG, "Unknown door letter: " + doorLetter);
                     return -1;
@@ -936,7 +1121,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
     }
 
     private void showSuccessResult() {
-        showStep(5);
+        showStep(6);
 
         ivResultIcon.setImageResource(R.drawable.ic_check_circle);
         ivResultIcon.setColorFilter(getResources().getColor(R.color.holo_green_dark));
@@ -950,7 +1135,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
     }
 
     private void showFailureResult(String errorMessage) {
-        showStep(5);
+        showStep(6);
 
         ivResultIcon.setImageResource(android.R.drawable.ic_delete);
         ivResultIcon.setColorFilter(getResources().getColor(android.R.color.holo_red_dark));
@@ -964,13 +1149,21 @@ public class ManualOverrideActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (currentStep == 3) {
-            // From confirmation, go back to vault selection (step 1)
+        if (currentStep == 2) {
+            // From fingerprint, go back to employee ID (step 1)
+            resetEmployeeVerificationState();  // Reset all verification state
             showStep(1);
+        } else if (currentStep == 3) {
+            // From vault selection, go back to fingerprint (step 2)
+            resetFingerprintState();  // Reset only fingerprint state
+            showStep(2);
         } else if (currentStep == 4) {
-            // From verification, go back to confirmation (step 3)
+            // From time frame, go back to vault selection (step 3)
             showStep(3);
         } else if (currentStep == 5) {
+            // From key switch monitoring, go back to time frame (step 4)
+            showStep(4);
+        } else if (currentStep == 6) {
             // From result, close activity
             super.onBackPressed();
         } else {
@@ -1067,34 +1260,54 @@ public class ManualOverrideActivity extends AppCompatActivity {
         btnProceedToVerification.setEnabled(false);
         btnProceedToVerification.setText("Creating...");
 
-        // Extract door ID
-        int doorId = extractDoorIdFromProfile(selectedProfile);
+        // Use controller variable name directly
+        String variableName = selectedProfile.getControllerVariableName();
         String vaultName = getDoorDisplayName();
         long startTimeMillis = System.currentTimeMillis();
 
-        // Create profile with time frame
+        // Get verified employee information
+        String employeeName = "Unknown";
+        String staffId = "Unknown";
+
+        if (verifiedUser != null) {
+            employeeName = verifiedUser.getName();
+            staffId = verifiedUser.getStaffId();
+        } else if (verifiedSyncedUser != null) {
+            employeeName = verifiedSyncedUser.getName();
+            staffId = verifiedSyncedUser.getEmployeeNumber();
+        }
+
+        Log.d(TAG, "Creating override with authenticated employee: " + employeeName + " (" + staffId + ")");
+        Log.d(TAG, "NOTE: Using 'Key Switch Authorized' for custodian fields (required for key switch monitoring)");
+
+        // Use "Key Switch Authorized" as placeholder for custodian fields
+        // This is required for the backend to properly detect key switch monitoring
+        // The employee authentication is recorded in the "requestedBy" field
         manualOverrideService.createOverrideProfile(
-                doorId,
+                variableName,             // Controller variable name (e.g., "MAIN.SOFT_LOCK_A")
                 vaultName,
-                "Key Switch Authorized",  // custodian1 (placeholder)
-                "Key Switch Authorized",  // name/custodian2 (placeholder)
-                "Key Switch Authorized",  // employee/custodian3 (placeholder)
-                "",  // department
+                "Key Switch Authorized",  // custodian1 - placeholder for key switch
+                "Key Switch Authorized",  // custodian2 - placeholder for key switch
+                "Key Switch Authorized",  // custodian3 - placeholder for key switch
+                "",                       // department parameter
                 startTimeMillis,
                 selectedEndTimeMillis,
-                "Mobile Kiosk - Key Switches",
+                "Mobile Kiosk - " + employeeName + " (" + staffId + ")",  // Authenticated employee recorded here
                 new ManualOverrideCallback() {
                     @Override
                     public void onProfileCreated(com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse profile) {
                         runOnUiThread(() -> {
                             Log.i(TAG, "✓ Override profile created successfully: " + profile.getProfileId());
-                            Toast.makeText(ManualOverrideActivity.this,
-                                "Profile created! Waiting for key switches...",
-                                Toast.LENGTH_SHORT).show();
+                            Log.i(TAG, "  → Profile ID: " + profile.getProfileId());
+                            Log.i(TAG, "  → Status: " + profile.getStatus());
+                            Log.i(TAG,"  → Door: " + getDoorDisplayName());
 
-                            // Profile created → Now show key switch monitoring
-                            resetKeySwitchState();
-                            showStep(4);
+                            // Re-enable button
+                            btnProceedToVerification.setEnabled(true);
+                            btnProceedToVerification.setText("Proceed to Verification");
+
+                            // Show success dialog with navigation options
+                            showOverrideSuccessDialog(profile);
                         });
                     }
 
@@ -1117,6 +1330,319 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 }
         );
     }
+
+    // =================== FINGERPRINT AUTHENTICATION (NEW) ===================
+
+    /**
+     * Start fingerprint scanning for employee authentication
+     */
+    private void startFingerprintScan() {
+        if (sdk == null) {
+            tvFingerprintStatus.setText("Scanner not initialized. Please restart the app.");
+            tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+            return;
+        }
+
+        if (isScanning) {
+            Toast.makeText(this, "Scan already in progress", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Reset UI
+        tvFingerprintStatus.setText("Place your finger on the scanner...");
+        tvFingerprintStatus.setTextColor(getResources().getColor(R.color.textPrimary));
+        fingerprintProgress.setVisibility(View.VISIBLE);
+        btnScanFingerprint.setEnabled(false);
+        verifiedEmployeeContainer.setVisibility(View.GONE);
+
+        isScanning = true;
+
+        executor.execute(() -> {
+            try {
+                // Cancel any previous operations
+                sdk.UF_Cancel(false);
+                Thread.sleep(100);
+
+                // Reconnect to scanner
+                sdk.UF_Reconnect();
+                Thread.sleep(200);
+
+                mainHandler.post(() -> tvFingerprintStatus.setText("Scanning fingerprint..."));
+
+                // Scan and identify
+                int[] userID = new int[1];
+                byte[] subID = new byte[1];
+                byte[] templateData = new byte[3840];
+                int[] templateSize = new int[1];
+                int[] imageQuality = new int[1];
+
+                Log.d(TAG, "Starting fingerprint identification...");
+                UF_RET_CODE ret = sdk.UF_ScanTemplate(templateData, templateSize, imageQuality);
+
+                if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
+                    ret = sdk.UF_IdentifyTemplate(384, templateData, userID, subID);
+                    Log.d(TAG, "Identification result: " + ret + ", User ID: " + userID[0]);
+                }
+
+                if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
+                    int scannedScannerID = userID[0];
+                    Log.d(TAG, "Fingerprint identified - Scanner ID: " + scannedScannerID);
+
+                    // Look up user in database
+                    DatabaseHelper.User user = dbHelper.getUserByScannerUserId(scannedScannerID);
+                    DatabaseHelper.SyncedFingerprint syncedUser = null;
+
+                    if (user == null) {
+                        Log.d(TAG, "Not found in users table, checking synced_fingerprints...");
+                        syncedUser = dbHelper.getUserByScannerId(scannedScannerID);
+                    }
+
+                    final DatabaseHelper.User finalUser = user;
+                    final DatabaseHelper.SyncedFingerprint finalSyncedUser = syncedUser;
+
+                    mainHandler.post(() -> {
+                        fingerprintProgress.setVisibility(View.GONE);
+                        btnScanFingerprint.setEnabled(true);
+
+                        // Cancel scanner operation
+                        try {
+                            sdk.UF_Cancel(false);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error cancelling scanner", e);
+                        }
+                        isScanning = false;
+
+                        if (finalUser != null || finalSyncedUser != null) {
+                            // Fingerprint found - now verify it matches the entered employee ID
+                            String scannedEmployeeName = finalUser != null ? finalUser.getName() : finalSyncedUser.getName();
+                            String scannedStaffId = finalUser != null ? finalUser.getStaffId() : finalSyncedUser.getEmployeeNumber();
+
+                            Log.d(TAG, "Scanned fingerprint belongs to: " + scannedEmployeeName + " (" + scannedStaffId + ")");
+                            Log.d(TAG, "Expected employee ID: " + enteredEmployeeId);
+
+                            // Verify the scanned fingerprint matches the entered employee ID
+                            boolean isMatch = false;
+                            if (finalUser != null && expectedUser != null) {
+                                // Both from users table - compare staff IDs
+                                isMatch = finalUser.getStaffId().equalsIgnoreCase(expectedUser.getStaffId());
+                            } else if (finalSyncedUser != null && expectedSyncedUser != null) {
+                                // Both from synced_fingerprints table - compare employee numbers
+                                isMatch = finalSyncedUser.getEmployeeNumber().equalsIgnoreCase(expectedSyncedUser.getEmployeeNumber());
+                            } else if (finalUser != null && expectedSyncedUser != null) {
+                                // User from users table, expected from synced - compare IDs
+                                isMatch = finalUser.getStaffId().equalsIgnoreCase(expectedSyncedUser.getEmployeeNumber());
+                            } else if (finalSyncedUser != null && expectedUser != null) {
+                                // User from synced, expected from users - compare IDs
+                                isMatch = finalSyncedUser.getEmployeeNumber().equalsIgnoreCase(expectedUser.getStaffId());
+                            }
+
+                            if (isMatch) {
+                                // SUCCESS: Fingerprint matches the entered employee ID
+                                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                                Log.d(TAG, "║ FINGERPRINT AUTHENTICATION SUCCESS");
+                                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                                Log.d(TAG, "║ Employee: " + scannedEmployeeName);
+                                Log.d(TAG, "║ Staff ID: " + scannedStaffId);
+
+                                // STEP 1: Check role authorization (reject Custodian role)
+                                String userRole = null;
+                                String userSource = null;
+
+                                if (finalSyncedUser != null) {
+                                    userRole = finalSyncedUser.getRole();
+                                    userSource = "synced_fingerprints table (from API)";
+                                    Log.d(TAG, "║ User Source: " + userSource);
+                                    Log.d(TAG, "║ Role: " + (userRole != null ? "'" + userRole + "'" : "NULL"));
+                                    Log.d(TAG, "║ Employee Number: " + finalSyncedUser.getEmployeeNumber());
+                                    Log.d(TAG, "║ Username: " + finalSyncedUser.getUsername());
+                                } else if (finalUser != null) {
+                                    userSource = "users table (local enrollment)";
+                                    Log.d(TAG, "║ User Source: " + userSource);
+                                    Log.d(TAG, "║ Role: N/A (local users don't have role field)");
+                                    Log.d(TAG, "║ Staff ID: " + finalUser.getStaffId());
+                                    Log.d(TAG, "║ Department: " + finalUser.getDepartment());
+                                }
+                                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+                                // Note: Local users (finalUser from users table) don't have role field, so we allow them by default
+
+                                if (userRole != null && "CUSTODIAN".equalsIgnoreCase(userRole)) {
+                                    // REJECTED: Custodian role is not authorized for manual override
+                                    Log.w(TAG, "✗ AUTHORIZATION FAILED: Custodian role cannot perform manual override");
+                                    Log.w(TAG, "  → Employee: " + scannedEmployeeName + " (" + scannedStaffId + ")");
+                                    Log.w(TAG, "  → Role: " + userRole);
+
+                                    tvFingerprintStatus.setText("❌ Authorization Failed\n\nCustodian role is not authorized to perform manual vault override.\n\nOnly Admin and other authorized roles can create override profiles.");
+                                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+
+                                    Toast.makeText(ManualOverrideActivity.this,
+                                        "Access Denied: Custodian role cannot perform manual override",
+                                        Toast.LENGTH_LONG).show();
+
+                                    // Do NOT set verification flags - keep user blocked
+                                    return;
+                                }
+
+                                // STEP 2: Role is authorized - proceed with verification
+                                isFingerprintVerified = true;
+                                verifiedUser = finalUser;
+                                verifiedSyncedUser = finalSyncedUser;
+
+                                Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                                Log.i(TAG, "║ AUTHORIZATION CHECK PASSED");
+                                Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                                if (userRole != null) {
+                                    Log.i(TAG, "║ Role: '" + userRole + "'");
+                                    Log.i(TAG, "║ Authorization: ✓ GRANTED (non-Custodian role)");
+                                } else {
+                                    Log.i(TAG, "║ Role: N/A");
+                                    Log.i(TAG, "║ Authorization: ✓ GRANTED (local user - allowed by default)");
+                                }
+                                Log.i(TAG, "║ Employee can proceed with manual override");
+                                Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+
+                                tvFingerprintStatus.setText("✓ Fingerprint Verified!");
+                                tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+
+                                // Show verified employee info
+                                tvVerifiedEmployeeName.setText(scannedEmployeeName);
+                                tvVerifiedEmployeeId.setText("Staff ID: " + scannedStaffId);
+                                verifiedEmployeeContainer.setVisibility(View.VISIBLE);
+
+                                // Enable proceed button
+                                btnProceedToVaultSelection.setEnabled(true);
+                                btnProceedToVaultSelection.setBackgroundTintList(getResources().getColorStateList(R.color.colorAccent));
+
+                                Toast.makeText(ManualOverrideActivity.this, "✓ Authenticated as " + scannedEmployeeName, Toast.LENGTH_SHORT).show();
+
+                            } else {
+                                // MISMATCH: Fingerprint does NOT match the entered employee ID
+                                Log.w(TAG, "✗ Fingerprint mismatch! Scanned: " + scannedStaffId + ", Expected: " + enteredEmployeeId);
+
+                                tvFingerprintStatus.setText("❌ Fingerprint Mismatch!\nThis fingerprint belongs to:\n" + scannedEmployeeName + "\n\nExpected employee ID: " + enteredEmployeeId);
+                                tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                                Toast.makeText(ManualOverrideActivity.this, "Fingerprint does not match employee ID " + enteredEmployeeId, Toast.LENGTH_LONG).show();
+                            }
+
+                        } else {
+                            // Not found in database at all
+                            tvFingerprintStatus.setText("❌ Fingerprint not recognized\nPlease try again");
+                            tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                            Toast.makeText(ManualOverrideActivity.this, "Fingerprint not registered", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+
+                } else {
+                    // Identification failed
+                    Log.e(TAG, "Fingerprint identification failed: " + ret);
+
+                    mainHandler.post(() -> {
+                        fingerprintProgress.setVisibility(View.GONE);
+                        btnScanFingerprint.setEnabled(true);
+
+                        try {
+                            sdk.UF_Cancel(false);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error cancelling scanner", e);
+                        }
+                        isScanning = false;
+
+                        tvFingerprintStatus.setText("❌ Fingerprint not recognized\nPlease try again");
+                        tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                        Toast.makeText(ManualOverrideActivity.this, "Fingerprint not recognized", Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error during fingerprint scan", e);
+
+                mainHandler.post(() -> {
+                    fingerprintProgress.setVisibility(View.GONE);
+                    btnScanFingerprint.setEnabled(true);
+
+                    try {
+                        sdk.UF_Cancel(false);
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Error cancelling scanner", ex);
+                    }
+                    isScanning = false;
+
+                    tvFingerprintStatus.setText("Error: " + e.getMessage());
+                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                    Toast.makeText(ManualOverrideActivity.this, "Error during scan", Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    /**
+     * Reset fingerprint authentication state
+     */
+    private void resetFingerprintState() {
+        isFingerprintVerified = false;
+        verifiedUser = null;
+        verifiedSyncedUser = null;
+        // Don't reset expectedUser/expectedSyncedUser here - we need them for validation
+
+        tvFingerprintStatus.setText("Tap button below to scan fingerprint");
+        tvFingerprintStatus.setTextColor(getResources().getColor(R.color.textPrimary));
+        verifiedEmployeeContainer.setVisibility(View.GONE);
+        fingerprintProgress.setVisibility(View.GONE);
+        btnScanFingerprint.setEnabled(true);
+        btnProceedToVaultSelection.setEnabled(false);
+        btnProceedToVaultSelection.setBackgroundTintList(getResources().getColorStateList(R.color.buttonBackground));
+    }
+
+    /**
+     * Reset all employee verification state (when going back to Step 1)
+     */
+    private void resetEmployeeVerificationState() {
+        enteredEmployeeId = "";
+        expectedUser = null;
+        expectedSyncedUser = null;
+        verifiedUser = null;
+        verifiedSyncedUser = null;
+        isFingerprintVerified = false;
+    }
+
+    // =================== SUCCESS DIALOG ===================
+
+    /**
+     * Show success dialog after profile created with navigation options
+     */
+    private void showOverrideSuccessDialog(com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse profile) {
+        String message = "Override profile activated successfully!\n\n" +
+                        "Door: " + getDoorDisplayName() + "\n" +
+                        "Profile ID: " + profile.getProfileId() + "\n\n" +
+                        "Go to the vault and turn all 3 key switches to open the door.\n\n" +
+                        "You can monitor the key switch status in real-time from the Vault Status page.";
+
+        new AlertDialog.Builder(this)
+            .setTitle("✓ Override Activated")
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton("Vault Status", (dialog, which) -> {
+                Log.d(TAG, "User chose to go to Vault Status page");
+
+                // Navigate to MainVaultStatusActivity
+                Intent intent = new Intent(ManualOverrideActivity.this, MainVaultStatusActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
+                finish();
+            })
+            .setNegativeButton("Main Menu", (dialog, which) -> {
+                Log.d(TAG, "User chose to go to Main Menu");
+
+                // Navigate to MainMenuActivity
+                Intent intent = new Intent(ManualOverrideActivity.this, MainMenuActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
+                finish();
+            })
+            .show();
+    }
+
+    // =================== LIFECYCLE ===================
 
     @Override
     protected void onDestroy() {
@@ -1151,6 +1677,16 @@ public class ManualOverrideActivity extends AppCompatActivity {
             } catch (InterruptedException e) {
                 Log.e(TAG, "Interrupted while waiting for executor shutdown", e);
                 Thread.currentThread().interrupt();
+            }
+        }
+
+        // Cancel any ongoing fingerprint scan
+        if (sdk != null && isScanning) {
+            try {
+                sdk.UF_Cancel(false);
+                Log.d(TAG, "Cancelled ongoing fingerprint scan");
+            } catch (Exception e) {
+                Log.e(TAG, "Error cancelling fingerprint scan", e);
             }
         }
 

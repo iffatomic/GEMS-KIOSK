@@ -13,6 +13,7 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import com.supremainc.sfm_sdk_android.DatabaseHelper;
 import com.supremainc.sfm_sdk_android.SignalRService;
 import com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto;
 import com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse;
@@ -109,6 +110,41 @@ public class FingerprintAutoSyncService extends Service {
             @Override
             public void onConnected() {
                 Log.i(TAG, "✓ SignalR connected - Auto-sync service active");
+
+                // CATCH-UP MECHANISM: Perform incremental sync on connection/reconnection
+                // This catches any fingerprints enrolled while we were disconnected
+                Log.i(TAG, "Performing catch-up sync to detect missed enrollments...");
+
+                fingerprintSyncService.syncAllFingerprintsIncremental(new FingerprintSyncService.SyncCallback() {
+                    @Override
+                    public void onSyncStarted(int totalFingerprints) {
+                        Log.d(TAG, "Catch-up sync started: checking " + totalFingerprints + " fingerprint(s)");
+                    }
+
+                    @Override
+                    public void onFingerprintEnrolled(int current, int total, String employeeName) {
+                        Log.i(TAG, "Caught-up: " + employeeName + " (" + current + "/" + total + ")");
+                    }
+
+                    @Override
+                    public void onSyncCompleted(int successCount, int failCount) {
+                        if (successCount > 0) {
+                            Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                            Log.i(TAG, "║ CATCH-UP SYNC COMPLETED");
+                            Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                            Log.i(TAG, "║ Found " + successCount + " new fingerprint(s) while offline");
+                            Log.i(TAG, "║ Failed: " + failCount);
+                            Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+                        } else {
+                            Log.d(TAG, "✓ Catch-up complete - no missed enrollments detected");
+                        }
+                    }
+
+                    @Override
+                    public void onSyncError(String error) {
+                        Log.e(TAG, "✗ Catch-up sync error: " + error);
+                    }
+                });
             }
 
             @Override
@@ -140,59 +176,71 @@ public class FingerprintAutoSyncService extends Service {
             Log.i(TAG, "║ Message: " + event.getMessage());
             Log.i(TAG, "╚════════════════════════════════════════════════════════════");
 
-            // OPTION 1: Call new optimized endpoint to get all fingerprints
-            // This is the recommended approach for better performance
-            Log.d(TAG, "Calling FingerprintDownload endpoint to get all employee fingerprints...");
+            // HYBRID APPROACH: Auto-detect database state
+            // - If database is empty → Full sync (catches historical data)
+            // - If database has data → Targeted sync (efficient)
+            DatabaseHelper dbHelper = new DatabaseHelper(getApplicationContext());
+            int totalSyncedFingerprints = dbHelper.getSyncedFingerprintCount();
+            dbHelper.close();
 
-            fingerprintDownloadApiClient.getAllEmployeesWithFingerprints(
-                    new ApiCallback<AllEmployeesFingerprintsResponse>() {
-                @Override
-                public void onSuccess(AllEmployeesFingerprintsResponse response) {
-                    Log.i(TAG, "✓ Successfully fetched fingerprint data from optimized endpoint");
-                    Log.d(TAG, "  → Total Employees: " + response.getTotalEmployees());
-                    Log.d(TAG, "  → Total Fingerprints: " + response.getTotalFingerprints());
+            String employeeNumber = event.getStaffID();
 
-                    // Now trigger incremental sync using the fetched data
-                    Log.d(TAG, "Triggering incremental fingerprint sync...");
+            if (totalSyncedFingerprints == 0) {
+                // Database is empty - likely first deployment or after reset
+                Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.i(TAG, "║ DATABASE EMPTY - TRIGGERING FULL SYNC");
+                Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.i(TAG, "║ This will download ALL historical fingerprints");
+                Log.i(TAG, "║ Synced fingerprints in DB: 0");
+                Log.i(TAG, "╚════════════════════════════════════════════════════════════");
 
+                // Full incremental sync (downloads all, skips none since DB is empty)
+                fingerprintSyncService.syncAllFingerprintsIncremental(new FingerprintSyncService.SyncCallback() {
+                    @Override
+                    public void onSyncStarted(int totalFingerprints) {
+                        Log.d(TAG, "Initial full sync started: " + totalFingerprints + " fingerprints to check");
+                    }
+
+                    @Override
+                    public void onFingerprintEnrolled(int current, int total, String employeeName) {
+                        Log.d(TAG, "Auto-enrolled: " + employeeName + " (" + current + "/" + total + ")");
+                    }
+
+                    @Override
+                    public void onSyncCompleted(int successCount, int failCount) {
+                        Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                        Log.i(TAG, "║ INITIAL FULL SYNC COMPLETED");
+                        Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                        Log.i(TAG, "║ Total enrolled: " + successCount);
+                        Log.i(TAG, "║ Failed: " + failCount);
+                        Log.i(TAG, "║ Future syncs will be targeted (single user)");
+                        Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+                    }
+
+                    @Override
+                    public void onSyncError(String error) {
+                        Log.e(TAG, "✗ Initial full sync error: " + error);
+                    }
+                });
+
+            } else {
+                // Database has data - use targeted sync for efficiency
+                Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.i(TAG, "║ DATABASE HAS DATA - USING TARGETED SYNC");
+                Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.i(TAG, "║ Synced fingerprints in DB: " + totalSyncedFingerprints);
+                Log.i(TAG, "║ Target employee: " + event.getFullName() + " (" + employeeNumber + ")");
+                Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+
+                if (employeeNumber == null || employeeNumber.isEmpty()) {
+                    Log.e(TAG, "✗ No employee number in event - cannot perform targeted sync");
+                    Log.w(TAG, "Falling back to full incremental sync");
+
+                    // Fallback to full sync if employee number is missing
                     fingerprintSyncService.syncAllFingerprintsIncremental(new FingerprintSyncService.SyncCallback() {
                         @Override
                         public void onSyncStarted(int totalFingerprints) {
-                            Log.d(TAG, "Auto-sync started: " + totalFingerprints + " fingerprints to check");
-                        }
-
-                        @Override
-                        public void onFingerprintEnrolled(int current, int total, String employeeName) {
-                            Log.d(TAG, "Auto-enrolled: " + employeeName + " (" + current + "/" + total + ")");
-                        }
-
-                        @Override
-                        public void onSyncCompleted(int successCount, int failCount) {
-                            Log.i(TAG, "╔════════════════════════════════════════════════════════════");
-                            Log.i(TAG, "║ AUTO-SYNC COMPLETED");
-                            Log.i(TAG, "╠════════════════════════════════════════════════════════════");
-                            Log.i(TAG, "║ New enrollments: " + successCount);
-                            Log.i(TAG, "║ Failed: " + failCount);
-                            Log.i(TAG, "╚════════════════════════════════════════════════════════════");
-                        }
-
-                        @Override
-                        public void onSyncError(String error) {
-                            Log.e(TAG, "✗ Auto-sync error: " + error);
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "✗ Failed to fetch fingerprints from optimized endpoint: " + error);
-                    Log.w(TAG, "Falling back to old sync method...");
-
-                    // OPTION 2: Fallback to old method if new endpoint fails
-                    fingerprintSyncService.syncAllFingerprintsIncremental(new FingerprintSyncService.SyncCallback() {
-                        @Override
-                        public void onSyncStarted(int totalFingerprints) {
-                            Log.d(TAG, "Fallback sync started: " + totalFingerprints + " fingerprints to check");
+                            Log.d(TAG, "Fallback full sync started: " + totalFingerprints + " fingerprints");
                         }
 
                         @Override
@@ -210,8 +258,52 @@ public class FingerprintAutoSyncService extends Service {
                             Log.e(TAG, "✗ Fallback sync error: " + error);
                         }
                     });
+                    return;
                 }
-            });
+
+                // OPTIMIZED: Sync only the specific employee who just enrolled
+                fingerprintSyncService.syncSingleUser(employeeNumber, new FingerprintSyncService.SyncCallback() {
+                    @Override
+                    public void onSyncStarted(int totalFingerprints) {
+                        Log.d(TAG, "Targeted sync started for " + event.getFullName() +
+                              ": " + totalFingerprints + " fingerprint(s)");
+                    }
+
+                    @Override
+                    public void onFingerprintEnrolled(int current, int total, String employeeName) {
+                        Log.d(TAG, "Auto-enrolled: " + employeeName + " - fingerprint " +
+                              current + "/" + total);
+                    }
+
+                    @Override
+                    public void onSyncCompleted(int successCount, int failCount) {
+                        Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                        Log.i(TAG, "║ TARGETED SYNC COMPLETED");
+                        Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                        Log.i(TAG, "║ Employee: " + event.getFullName());
+                        Log.i(TAG, "║ New enrollments: " + successCount);
+                        Log.i(TAG, "║ Failed: " + failCount);
+
+                        if (successCount > 0) {
+                            Log.i(TAG, "║ ✓ Successfully enrolled " + successCount +
+                                  " fingerprint(s) for " + event.getFullName());
+                        } else if (failCount == 0) {
+                            Log.i(TAG, "║ ⊙ No new fingerprints to enroll (already synced)");
+                        }
+                        Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+                    }
+
+                    @Override
+                    public void onSyncError(String error) {
+                        Log.e(TAG, "╔════════════════════════════════════════════════════════════");
+                        Log.e(TAG, "║ TARGETED SYNC ERROR");
+                        Log.e(TAG, "╠════════════════════════════════════════════════════════════");
+                        Log.e(TAG, "║ Employee: " + event.getFullName() + " (" + employeeNumber + ")");
+                        Log.e(TAG, "║ Error: " + error);
+                        Log.e(TAG, "╚════════════════════════════════════════════════════════════");
+                    }
+                });
+            }
         }
 
         // ========== Unused callbacks (no-op) ==========

@@ -567,16 +567,112 @@ public class SystemSettingsActivity extends AppCompatActivity {
                         totalProcessed++;
 
                         try {
-                            // Get raw byte array template (NO Base64 decode needed!)
-                            byte[] templateBytes = fingerprint.getTemplateData();
+                            // ═══════════════════════════════════════════════════════════
+                            // DIAGNOSTIC LOGGING: Compare PAC_API vs Hardcoded Working Value
+                            // ═══════════════════════════════════════════════════════════
 
-                            if (templateBytes == null || templateBytes.length == 0) {
+                            String pacApiString = fingerprint.getTemplateDataString();
+
+                            Log.d(TAG, "╔══════════════════════════════════════════════════════════════");
+                            Log.d(TAG, "║ DIAGNOSTIC: PAC_API DATA ANALYSIS");
+                            Log.d(TAG, "╠══════════════════════════════════════════════════════════════");
+                            Log.d(TAG, "║ Employee: " + employee.getFullName() + " (" + employee.getStaffID() + ")");
+                            Log.d(TAG, "║ Fingerprint ID: " + fingerprint.getId());
+                            Log.d(TAG, "╠══════════════════════════════════════════════════════════════");
+
+                            if (pacApiString != null && !pacApiString.isEmpty()) {
+                                Log.d(TAG, "║ PAC_API String Length: " + pacApiString.length() + " chars");
+                                Log.d(TAG, "║ First 150 chars from PAC_API:");
+                                Log.d(TAG, "║   " + pacApiString.substring(0, Math.min(150, pacApiString.length())));
+
+                                // Parse first 20 bytes from PAC_API
+                                try {
+                                    String cleaned = pacApiString.replace("[", "").replace("]", "");
+                                    String[] parts = cleaned.split(",");
+                                    Log.d(TAG, "║ PAC_API Total byte count: " + parts.length);
+
+                                    StringBuilder first20 = new StringBuilder("║ PAC_API First 20 bytes: [");
+                                    for (int i = 0; i < Math.min(20, parts.length); i++) {
+                                        first20.append(parts[i].trim());
+                                        if (i < Math.min(20, parts.length) - 1) first20.append(", ");
+                                    }
+                                    first20.append("]");
+                                    Log.d(TAG, first20.toString());
+
+                                    // Show bytes 6-7 (should be 'U','F' = 85,70 for Suprema)
+                                    if (parts.length >= 8) {
+                                        int byte6 = Integer.parseInt(parts[6].trim());
+                                        int byte7 = Integer.parseInt(parts[7].trim());
+                                        Log.d(TAG, "║ PAC_API Bytes[6-7] (Suprema signature): " + byte6 + ", " + byte7 +
+                                                   " (expected: 85, 70 for 'UF')");
+                                    }
+
+                                } catch (Exception e) {
+                                    Log.e(TAG, "║ ERROR parsing PAC_API data: " + e.getMessage());
+                                }
+                            } else {
+                                Log.e(TAG, "║ PAC_API returned NULL or EMPTY string!");
+                            }
+
+                            Log.d(TAG, "╠══════════════════════════════════════════════════════════════");
+                            Log.d(TAG, "║ HARDCODED (Working) First 20 bytes: [69, 26, 16, 20, 158, 0, 85, 70, 59, 65, 240, 152, 14, 48, 2, 1, 151, 10, 54, 194]");
+                            Log.d(TAG, "║ HARDCODED Bytes[6-7]: 85, 70 ('UF' - Suprema signature) ✓");
+                            Log.d(TAG, "╚══════════════════════════════════════════════════════════════");
+
+                            // Get string template (Arrays.toString format from PAC_API)
+                            String templateString = fingerprint.getTemplateDataString();
+
+                            //testing hardcoded fingerprint templateString (left thumb)
+
+                            //Suprema template format
+                            //String templateString = "[69, 26, 16, 20, 158, 0, 85, 70, 59, 65, 240, 152, 14, 48, 2, 1, 151, 10, 54, 194, 17, 69, 137, 59, 66, 176, 72, 138, 61, 67, 96, 165, 136, 30, 3, 225, 157, 133, 53, 195, 240, 160, 9, 53, 196, 176, 165, 12, 44, 6, 49, 163, 9, 32, 135, 128, 163, 137, 56, 135, 209, 174, 134, 19, 200, 1, 161, 6, 41, 8, 96, 80, 133, 27, 201, 33, 76, 134, 15, 74, 33, 162, 129, 56, 11, 96, 1, 133, 15, 203, 225, 162, 8, 56, 12, 209, 179, 132, 53, 142, 177, 4, 134, 25, 15, 177, 169, 134, 13, 15, 192, 76, 140, 46, 15, 209, 3, 8, 36, 143, 240, 0, 9, 24, 81, 208, 175, 135, 16, 82, 208, 169, 10, 28, 211, 145, 177, 131, 255, 255, 255, 255, 68, 85, 95, 255, 255, 255, 255, 244, 68, 69, 85, 255, 255, 255, 255, 85, 68, 68, 85, 79, 255, 255, 244, 68, 68, 68, 68, 79, 255, 255, 68, 68, 51, 51, 51, 51, 255, 255, 67, 51, 51, 34, 33, 15, 255, 255, 51, 51, 50, 34, 17, 16, 255, 255, 51, 50, 34, 33, 17, 14, 255, 255, 51, 50, 34, 33, 16, 0, 255, 255, 51, 34, 34, 33, 0, 0, 255, 255, 51, 34, 34, 17, 0, 0, 255, 243, 34, 34, 33, 17, 0, 0, 255, 243, 34, 34, 33, 17, 0, 14, 255, 242, 34, 34, 17, 16, 14, 238, 255, 242, 34, 17, 17, 16, 238, 238, 255, 242, 17, 17, 0, 0, 238, 238, 255, 243, 17, 16, 0, 238, 238, 238, 255, 243, 17, 0, 14, 238, 238, 238, 255, 243, 16, 0, 14, 238, 238, 223, 255, 243, 16, 0, 14, 238, 237, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]";
+
+                            //Suprema template format  (Ghani)
+                            //String templateString = "[68, 31, 18, 25, 168, 0, 83, 66, 53, 36, 16, 9, 89, 38, 114, 6, 99, 42, 242, 8, 34, 47, 155, 3, 122, 49, 227, 131, 77, 53, 120, 6, 65, 55, 15, 139, 65, 59, 127, 14, 44, 64, 151, 8, 98, 71, 236, 9, 116, 71, 228, 128, 134, 74, 225, 135, 115, 77, 97, 130, 93, 78, 104, 9, 26, 84, 45, 133, 91, 89, 237, 138, 58, 99, 45, 141, 61, 104, 158, 145, 97, 104, 90, 135, 78, 106, 10, 159, 67, 111, 147, 154, 84, 113, 253, 34, 121, 125, 86, 10, 73, 131, 51, 23, 77, 131, 68, 174, 50, 133, 181, 130, 55, 133, 58, 132, 76, 137, 67, 144, 71, 139, 183, 136, 39, 141, 55, 135, 95, 160, 74, 133, 255, 255, 255, 254, 0, 17, 255, 255, 255, 255, 255, 253, 238, 0, 17, 35, 255, 255, 255, 255, 205, 238, 0, 17, 35, 63, 255, 255, 252, 205, 222, 0, 17, 35, 52, 255, 255, 252, 205, 238, 0, 17, 35, 52, 79, 255, 188, 204, 222, 0, 17, 35, 52, 79, 248, 187, 204, 222, 0, 18, 35, 52, 68, 136, 171, 188, 222, 1, 18, 35, 52, 68, 136, 171, 188, 205, 224, 18, 51, 51, 68, 120, 171, 187, 205, 224, 18, 51, 51, 68, 136, 170, 187, 188, 224, 18, 51, 68, 68, 137, 170, 170, 188, 208, 35, 52, 68, 68, 136, 153, 170, 171, 208, 35, 68, 68, 68, 153, 153, 153, 154, 192, 35, 69, 85, 68, 153, 153, 153, 153, 190, 52, 85, 85, 68, 153, 153, 153, 153, 170, 69, 102, 101, 84, 153, 153, 153, 136, 152, 102, 102, 101, 84, 169, 153, 152, 136, 135, 102, 102, 101, 85, 186, 136, 136, 135, 119, 118, 102, 101, 85, 187, 136, 136, 135, 119, 118, 102, 101, 85, 169, 136, 136, 119, 119, 118, 102, 101, 85, 170, 151, 119, 119, 119, 118, 102, 101, 95, 255, 255, 247, 119, 119, 102, 102, 85, 255, 255, 255, 255, 247, 118, 102, 101, 255, 255, 255, 255, 255, 255, 246, 102, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]";
+
+                            //iso19794_2 template format
+                            //String templateString = "[70, 77, 82, 0, 32, 50, 48, 0, 0, 0, 1, 37, 0, 0, 1, 44, 1, 144, 0, 197, 0, 197, 1, 0, 0, 0, 100, 43, 128, 193, 0, 55, 13, 0, 128, 163, 0, 77, 12, 0, 128, 153, 0, 111, 9, 0, 64, 110, 0, 120, 19, 0, 64, 143, 0, 136, 10, 0, 64, 30, 0, 154, 26, 0, 129, 13, 0, 159, 111, 0, 128, 36, 0, 172, 23, 0, 64, 215, 0, 176, 116, 0, 64, 38, 0, 179, 156, 0, 64, 246, 0, 188, 234, 0, 128, 53, 0, 196, 25, 0, 64, 146, 0, 197, 0, 0, 128, 192, 0, 214, 240, 0, 64, 111, 0, 225, 10, 0, 64, 150, 0, 240, 239, 0, 128, 53, 0, 245, 30, 0, 129, 1, 0, 250, 229, 0, 64, 149, 1, 3, 228, 0, 128, 112, 1, 7, 4, 0, 128, 115, 1, 17, 249, 0, 64, 153, 1, 29, 105, 0, 128, 129, 1, 30, 227, 0, 128, 18, 1, 31, 31, 0, 64, 37, 1, 34, 164, 0, 64, 177, 1, 34, 218, 0, 65, 9, 1, 38, 215, 0, 128, 102, 1, 44, 9, 0, 128, 117, 1, 44, 222, 0, 64, 106, 1, 50, 166, 0, 64, 109, 1, 54, 173, 0, 128, 206, 1, 59, 215, 0, 64, 122, 1, 61, 194, 0, 64, 248, 1, 64, 215, 0, 64, 167, 1, 71, 202, 0, 65, 19, 1, 84, 85, 0, 128, 206, 1, 85, 204, 0, 64, 59, 1, 90, 169, 0, 128, 148, 1, 92, 184, 0, 64, 72, 1, 94, 169, 0, 64, 26, 1, 98, 36, 0, 64, 187, 1, 99, 192, 0, 128, 89, 1, 117, 174, 0, 0, 5, 1, 68, 0, 5, 163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]";
+
+                            //ansi378 template format
+                            //String templateString = "[70, 77, 82, 0, 32, 50, 48, 0, 0, 247, 0, 68, 1, 0, 0, 0, 1, 44, 1, 144, 0, 197, 0, 197, 1, 0, 0, 0, 60, 35, 128, 110, 0, 64, 12, 0, 64, 225, 0, 74, 179, 0, 128, 190, 0, 78, 5, 0, 129, 24, 0, 81, 172, 0, 64, 161, 0, 93, 7, 0, 128, 148, 0, 128, 4, 0, 64, 103, 0, 134, 11, 0, 64, 140, 0, 150, 3, 0, 129, 8, 0, 191, 73, 0, 64, 211, 0, 196, 79, 0, 128, 40, 0, 205, 14, 0, 128, 140, 0, 206, 0, 0, 64, 240, 0, 213, 160, 0, 128, 189, 0, 229, 164, 0, 64, 107, 0, 232, 5, 0, 64, 147, 0, 249, 166, 0, 128, 39, 0, 251, 18, 0, 128, 143, 1, 5, 160, 0, 64, 113, 1, 6, 176, 0, 128, 244, 1, 18, 154, 0, 128, 110, 1, 21, 175, 0, 128, 124, 1, 34, 157, 0, 64, 147, 1, 34, 73, 0, 128, 97, 1, 43, 0, 0, 64, 170, 1, 44, 149, 0, 64, 98, 1, 49, 108, 0, 64, 102, 1, 59, 115, 0, 64, 110, 1, 62, 127, 0, 64, 246, 1, 64, 147, 0, 128, 191, 1, 73, 142, 0, 64, 153, 1, 76, 134, 0, 64, 226, 1, 86, 146, 0, 128, 125, 1, 98, 120, 0, 128, 184, 1, 99, 136, 0, 64, 162, 1, 108, 130, 0, 0, 5, 1, 68, 0, 5, 165, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]";
+
+                            if (templateString == null || templateString.isEmpty()) {
                                 Log.e(TAG, "  ✗ Empty template data - skipping");
                                 failCount++;
                                 continue;
                             }
 
-                            Log.d(TAG, "  → Raw template size: " + templateBytes.length + " bytes");
+                            templateString = templateString.replace("[", "").replace("]", "");
+                            String[] parts = templateString.split(",");
+
+                            int maxLen = Math.min(parts.length, 384);
+                            byte[] signedBytes = new byte[maxLen];
+
+                            for (int i = 0; i < maxLen; i++) {
+                                int value = Integer.parseInt(parts[i].trim()); // 0–255
+                                signedBytes[i] = (byte) value;                 // SIGNED byte
+                            }
+                            Log.d(TAG, "  ┌─ STEP 1: Received from API ──────────────");
+                            Log.d(TAG, "  │ Format: Arrays.toString() - DIRECT from PAC_API!");
+                            Log.d(TAG, "  │ String length: " + templateString.length() + " chars");
+                            Log.d(TAG, "  │ First 50 chars: " + templateString.substring(0, Math.min(50, templateString.length())));
+
+                            // Convert string to byte[] immediately
+                            byte[] templateBytes = DatabaseHelper.parseStringToByteArray(templateString);
+
+                            if (templateBytes == null || templateBytes.length == 0) {
+                                Log.e(TAG, "  ✗ Failed to parse template string - skipping");
+                                failCount++;
+                                continue;
+                            }
+
+                            Log.d(TAG, "  │ Parsed to: " + templateBytes.length + " bytes");
+                            StringBuilder hexReceived = new StringBuilder();
+                            for (int i = 0; i < Math.min(20, templateBytes.length); i++) {
+                                hexReceived.append(String.format("%02X ", templateBytes[i]));
+                            }
+                            Log.d(TAG, "  │ First 20 bytes (HEX): " + hexReceived.toString());
+                            Log.d(TAG, "  └────────────────────────────────────────");
 
                             // STEP 1: Save fingerprint to SQLite database FIRST
                             // This is REQUIRED before enrolling to scanner
@@ -585,14 +681,15 @@ public class SystemSettingsActivity extends AppCompatActivity {
                             // Convert fingerType int to string
                             String fingerTypeStr = getFingerTypeName(fingerprint.getFingerIndex());
 
-                            // Save raw byte[] directly to database (BLOB column)
+                            // Save original string directly to database (TEXT column)
+                            // IMPORTANT: Store the ORIGINAL unsigned format from API, not the converted signed format!
                             int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
                                 String.valueOf(fingerprint.getId()),        // API ID
                                 employee.getStaffID(),                      // Employee Number
                                 employee.getStaffID(),                      // Username (use staffID)
                                 employee.getFullName(),                     // Name
-                                employee.getDepartment() != null ? employee.getDepartment() : "N/A", // Role
-                                templateBytes,                              // Raw byte[] (stored as BLOB)
+                                employee.getRole() != null ? employee.getRole() : "N/A", // FIXED: Role (not department!)
+                                templateString,                             // Original string from API (unsigned: "[69, 145, ...]")
                                 fingerprint.getLeftRight(),                 // 0=Left, 1=Right
                                 fingerprint.getFingerIndex(),               // 0-4 (Thumb to Little)
                                 fingerTypeStr                               // Finger type name
@@ -605,79 +702,136 @@ public class SystemSettingsActivity extends AppCompatActivity {
                             }
                             Log.d(TAG, "  ✓ Saved to database (Scanner ID: " + scannerId + ")");
 
-                            // STEP 2: Read template from database and convert back to byte[]
-                            Log.d(TAG, "  → Reading template from database...");
-                            String templateString = dbHelper.getTemplateDataByScannerId(scannerId);
+                            Log.d(TAG, "  ┌─ STEP 2: Database Round-Trip ───────────");
+                            Log.d(TAG, "  │ Reading from database...");
+                            String templateStringFromDb = dbHelper.getTemplateDataByScannerId(scannerId);
 
-                            if (templateString == null) {
+                            if (templateStringFromDb == null) {
                                 Log.e(TAG, "  ✗ Failed to read template from database");
                                 failCount++;
                                 continue;
                             }
 
-                            Log.d(TAG, "  → Converting string to byte array...");
-                            byte[] templateBytesFromDb = DatabaseHelper.parseStringToByteArray(templateString);
+                            Log.d(TAG, "  │ DB string length: " + templateStringFromDb.length() + " chars");
+                            Log.d(TAG, "  │ First 50 chars: " + templateStringFromDb.substring(0, Math.min(50, templateStringFromDb.length())));
+
+                            byte[] templateBytesFromDb = DatabaseHelper.parseStringToByteArray(templateStringFromDb);
 
                             if (templateBytesFromDb == null) {
-                                Log.e(TAG, "  ✗ Failed to convert template string to byte array");
+                                Log.e(TAG, "  ✗ Failed to parse DB template string");
                                 failCount++;
                                 continue;
                             }
 
-                            Log.d(TAG, "  ✓ Template converted from database (size: " + templateBytesFromDb.length + " bytes)");
+                            Log.d(TAG, "  │ Converted size: " + templateBytesFromDb.length + " bytes");
+                            StringBuilder hexFromDb = new StringBuilder();
+                            for (int i = 0; i < Math.min(20, templateBytesFromDb.length); i++) {
+                                hexFromDb.append(String.format("%02X ", templateBytesFromDb[i]));
+                            }
+                            Log.d(TAG, "  │ First 20 bytes (HEX): " + hexFromDb.toString());
 
-                            // STEP 3: Now enroll to scanner - split if needed
+                            // CRITICAL: Compare with original
+                            boolean dataMatches = true;
+                            if (templateBytes.length == templateBytesFromDb.length) {
+                                for (int i = 0; i < Math.min(20, templateBytes.length); i++) {
+                                    if (templateBytes[i] != templateBytesFromDb[i]) {
+                                        dataMatches = false;
+                                        Log.e(TAG, "  │ ⚠ MISMATCH at byte " + i + ": Original=" +
+                                            String.format("%02X", templateBytes[i]) + " vs DB=" +
+                                            String.format("%02X", templateBytesFromDb[i]));
+                                        break;
+                                    }
+                                }
+                            } else {
+                                dataMatches = false;
+                                Log.e(TAG, "  │ ⚠ SIZE MISMATCH: Original=" + templateBytes.length +
+                                    " vs DB=" + templateBytesFromDb.length);
+                            }
+                            Log.d(TAG, "  │ Data integrity: " + (dataMatches ? "✓ MATCH" : "✗ CORRUPTED"));
+                            Log.d(TAG, "  └────────────────────────────────────────");
+
+                            // STEP 3: Enroll to scanner - SPLIT 768 bytes into TWO 384-byte templates
+                            // VEMS2 Desktop sends 768 bytes (2 templates of same finger)
+                            // We enroll BOTH templates with different Scanner IDs for better matching
                             int STANDARD_TEMPLATE_SIZE = 384;
                             int templateCount = templateBytesFromDb.length / STANDARD_TEMPLATE_SIZE;
 
                             if (templateBytesFromDb.length % STANDARD_TEMPLATE_SIZE != 0) {
-                                Log.e(TAG, "  ✗ Invalid template size: " + templateBytesFromDb.length);
+                                Log.e(TAG, "  ✗ Invalid template size: " + templateBytesFromDb.length + " bytes");
                                 failCount++;
                                 continue;
                             }
 
                             Log.d(TAG, "  → Detected " + templateCount + " template(s) of " + STANDARD_TEMPLATE_SIZE + " bytes each");
+                            Log.d(TAG, "  → Enrolling ALL " + templateCount + " templates with separate Scanner IDs");
 
-                            // Process each 384-byte template separately
-                            for (int t = 0; t < templateCount; t++) {
-                                byte[] singleTemplate = new byte[STANDARD_TEMPLATE_SIZE];
-                                System.arraycopy(templateBytesFromDb, t * STANDARD_TEMPLATE_SIZE, singleTemplate, 0, STANDARD_TEMPLATE_SIZE);
+                            // Enroll each template separately
+                            int enrolledCount = 0;
+                            for (int t = 0; t < 1; t++) {
+                                // Extract this template
+                                byte[] template = new byte[STANDARD_TEMPLATE_SIZE];
+                                System.arraycopy(templateBytesFromDb, t * STANDARD_TEMPLATE_SIZE, template, 0, STANDARD_TEMPLATE_SIZE);
 
-                                // Log first 16 bytes
-                                StringBuilder hex = new StringBuilder();
-                                for (int i = 0; i < Math.min(16, singleTemplate.length); i++) {
-                                    hex.append(String.format("%02X ", singleTemplate[i]));
+                                // Calculate Scanner ID (offset by 50000 for each template)
+                                // Template 1: scannerId (e.g., 10001)
+                                // Template 2: scannerId + 50000 (e.g., 60001)
+                                int enrollUserId = scannerId + (t * 50000);
+
+                                Log.d(TAG, "  ┌─ STEP 3." + (t+1) + ": Enrolling Template " + (t+1) + " ───");
+                                Log.d(TAG, "  │ Scanner ID: " + enrollUserId);
+                                Log.d(TAG, "  │ Template size: " + STANDARD_TEMPLATE_SIZE + " bytes");
+
+                                // Log first 20 bytes
+                                StringBuilder hexEnroll = new StringBuilder();
+                                for (int i = 0; i < Math.min(20, template.length); i++) {
+                                    hexEnroll.append(String.format("%02X ", template[i]));
                                 }
-                                Log.d(TAG, "  → Template #" + (t+1) + " first 16 bytes: " + hex.toString());
+                                Log.d(TAG, "  │ First 20 bytes (HEX): " + hexEnroll.toString());
+                                Log.d(TAG, "  │ Calling UF_EnrollTemplate...");
 
-                                // Enroll template to scanner using DATABASE scanner ID as USER ID
-                                // This ensures when UF_Identify returns a scanner ID, it matches our database
                                 int[] enrollId = new int[1];
+                                int[] templateSize = new int[1];
+                                enrollId[0] = 0;
+                                templateSize[0] = 384;
                                 long startTime = System.currentTimeMillis();
 
                                 UF_RET_CODE enrollRet = sdk.UF_EnrollTemplate(
-                                    scannerId,                                // USER ID = Database Scanner ID (10001, 10002, etc)
-                                    UF_ENROLL_OPTION.UF_ENROLL_NONE,         // Use provided ID, don't auto-generate
-                                    STANDARD_TEMPLATE_SIZE,                   // Always 384 bytes
-                                    singleTemplate,                           // Single template
-                                    enrollId                                   // Output: assigned enroll ID
+                                    enrollUserId,                         // Different ID for each template
+                                    UF_ENROLL_OPTION.UF_ENROLL_NONE,     // Use provided ID
+                                        templateSize[0],               // 384 bytes
+                                        signedBytes,                             // This template
+                                        enrollId
                                 );
 
                                 long elapsed = System.currentTimeMillis() - startTime;
-                                Log.d(TAG, "  → UF_EnrollTemplate #" + (t+1) + " completed in " + elapsed + "ms");
-                                Log.d(TAG, "  → Result: " + enrollRet);
+                                Log.d(TAG, "  │ Completed in " + elapsed + "ms");
+                                Log.d(TAG, "  │ Result: " + enrollRet);
+                                Log.d(TAG, "  │ Returned enrollID: " + enrollId[0]);
 
                                 if (enrollRet == UF_RET_CODE.UF_RET_SUCCESS) {
-                                    Log.d(TAG, "  ✓ Template #" + (t+1) + " enrolled successfully (Scanner ID: " + enrollId[0] + ")");
-                                    successCount++;
+                                    Log.d(TAG, "  │ Status: ✓ SUCCESS");
+                                    Log.d(TAG, "  └────────────────────────────────────────");
+                                    enrolledCount++;
+                                } else if (enrollRet == UF_RET_CODE.UF_ERR_EXIST_ID) {
+                                    Log.d(TAG, "  │ Status: ⊙ ALREADY EXISTS");
+                                    Log.d(TAG, "  └────────────────────────────────────────");
+                                    enrolledCount++;
                                 } else {
-                                    Log.e(TAG, "  ✗ Template #" + (t+1) + " enrollment failed: " + enrollRet);
-                                    if (enrollRet == UF_RET_CODE.UF_ERR_EXIST_ID) {
-                                        skippedCount++;
-                                    } else {
-                                        failCount++;
-                                    }
+                                    Log.e(TAG, "  │ Status: ✗ FAILED");
+                                    Log.e(TAG, "  │ Error: " + enrollRet);
+                                    Log.e(TAG, "  └────────────────────────────────────────");
                                 }
+                            }
+
+                            // Count as success if at least one template enrolled
+                            if (enrolledCount > 0) {
+                                Log.d(TAG, "  ✓ Enrolled " + enrolledCount + "/" + templateCount + " templates");
+                                successCount++;
+                                // Mark as enrolled in database
+                                dbHelper.markSyncedFingerprintAsEnrolled(scannerId);
+                            } else {
+                                Log.e(TAG, "  ✗ Failed to enroll any templates");
+                                failCount++;
                             }
 
                         } catch (Exception e) {
@@ -688,7 +842,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
                 }
 
                 // Fix provisional templates
-                sdk.UF_FixProvisionalTemplate();
+                //sdk.UF_FixProvisionalTemplate();
 
                 // Save templates to persistent flash memory
                 // WITHOUT THIS: Templates exist only in RAM and are lost when scanner disconnects
@@ -696,18 +850,18 @@ public class SystemSettingsActivity extends AppCompatActivity {
                 Log.d(TAG, "Saving templates to persistent flash memory...");
                 long saveStartTime = System.currentTimeMillis();
 
-                UF_RET_CODE saveRet = sdk.UF_Save();
-
-                long saveElapsed = System.currentTimeMillis() - saveStartTime;
-                Log.d(TAG, "UF_Save() completed in " + saveElapsed + "ms");
-                Log.d(TAG, "Result: " + saveRet);
-
-                if (saveRet == UF_RET_CODE.UF_RET_SUCCESS) {
-                    Log.d(TAG, "✓ Templates successfully persisted to flash memory");
-                } else {
-                    Log.e(TAG, "✗ Failed to save templates to flash: " + saveRet);
-                    Log.e(TAG, "⚠ WARNING: Templates may be lost when scanner disconnects!");
-                }
+//                UF_RET_CODE saveRet = sdk.UF_Save();
+//
+//                long saveElapsed = System.currentTimeMillis() - saveStartTime;
+//                Log.d(TAG, "UF_Save() completed in " + saveElapsed + "ms");
+//                Log.d(TAG, "Result: " + saveRet);
+//
+//                if (saveRet == UF_RET_CODE.UF_RET_SUCCESS) {
+//                    Log.d(TAG, "✓ Templates successfully persisted to flash memory");
+//                } else {
+//                    Log.e(TAG, "✗ Failed to save templates to flash: " + saveRet);
+//                    Log.e(TAG, "⚠ WARNING: Templates may be lost when scanner disconnects!");
+//                }
 
                 // Final results
                 final int finalSuccess = successCount;
@@ -807,61 +961,77 @@ public class SystemSettingsActivity extends AppCompatActivity {
     boolean Enroll(int id, int fingerCount, byte[] template, String employeeNumber)
     {
         final String TAG = "Enroll_2";
-        UF_RET_CODE ret = null;
 
-
-        int userID = id;
-        int[] enrollID = new int[1];
-        int[] imageQuality = new int[1];
-        int[] numOfTemplate = new int[1];
-        byte[] templateData = new byte[3840];
-        int[] templateSize = new int[1];
-        int[] _userID = new int[1];
-        byte[] _subID = new byte[1];
-
-        enrollID[0] = 0;
-        imageQuality[0] = 0;
-        templateSize[0] = template.length;
-        templateData = template;
+        int STANDARD_TEMPLATE_SIZE = 384;
+        int templateCount = template.length / STANDARD_TEMPLATE_SIZE;
 
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
-        Log.d(TAG, "║ ENROLLING TO SCANNER");
-        Log.d(TAG, "║ User ID (Scanner ID): " + userID);
+        Log.d(TAG, "║ ENROLLING TO SCANNER (Split Mode)");
+        Log.d(TAG, "║ User ID (Scanner ID): " + id);
         Log.d(TAG, "║ Employee Number: " + employeeNumber);
-        Log.d(TAG, "║ Template Size: " + templateSize[0] + " bytes");
+        Log.d(TAG, "║ Template Size: " + template.length + " bytes");
+        Log.d(TAG, "║ Template Count: " + templateCount);
         Log.d(TAG, "║ Finger Count: " + fingerCount);
         Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-        ret = sdk.UF_EnrollTemplate(userID, UF_ENROLL_OPTION.UF_ENROLL_NONE, templateSize[0], templateData, enrollID);
+        if (template.length % STANDARD_TEMPLATE_SIZE != 0) {
+            Log.e(TAG, "✗ Invalid template size: " + template.length + " bytes");
+            return false;
+        }
 
-        Log.d(TAG, "UF_EnrollTemplate Result: " + ret);
-        Log.d(TAG, "Return Code String: " + (ret != null ? ret.toString() : "NULL"));
-        Log.d(TAG, "Enroll ID returned: " + enrollID[0]);
+        int enrolledCount = 0;
 
-        if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
-            Log.d(TAG, "✓ Enroll SUCCESS - enrollID: " + enrollID[0] + ", User ID: " + userID + ", Employee: " + employeeNumber + ", Template: " + Arrays.toString(template));
-            return true;
-        } else {
-            Log.e(TAG, "✗ Enroll FAILED");
-            Log.e(TAG, "  Return Code: " + ret);
-            Log.e(TAG, "  User ID: " + userID);
-            Log.e(TAG, "  Template Size: " + templateSize[0] + " bytes");
-            Log.e(TAG, "  Template Data: " + Arrays.toString(templateData));
-            Log.e(TAG, "  Expected: 384 bytes (standard) or 768 bytes (concatenated)");
+        // Enroll each 384-byte template separately
+        for (int t = 0; t < templateCount; t++) {
+            // Extract single 384-byte template
+            byte[] singleTemplate = new byte[STANDARD_TEMPLATE_SIZE];
+            System.arraycopy(template, t * STANDARD_TEMPLATE_SIZE, singleTemplate, 0, STANDARD_TEMPLATE_SIZE);
 
-            if (ret == UF_RET_CODE.UF_ERR_TIME_OUT) {
-                Log.e(TAG, "  Error Type: TIMEOUT");
+            // Use offset ID for second template to avoid collision
+            // Template 1: id (e.g., 10001)
+            // Template 2: id + 50000 (e.g., 60001)
+            int enrollUserId = id + (t * 50000);
+
+            Log.d(TAG, "→ Enrolling template #" + (t+1) + " with Scanner ID: " + enrollUserId);
+
+            int[] enrollID = new int[1];
+            UF_RET_CODE ret = sdk.UF_EnrollTemplate(
+                enrollUserId,
+                UF_ENROLL_OPTION.UF_ENROLL_NONE,
+                STANDARD_TEMPLATE_SIZE,
+                singleTemplate,
+                enrollID
+            );
+
+            Log.d(TAG, "  UF_EnrollTemplate Result: " + ret);
+            Log.d(TAG, "  Enroll ID returned: " + enrollID[0]);
+
+            if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
+                Log.d(TAG, "  ✓ Template #" + (t+1) + " enrolled successfully");
+                enrolledCount++;
             } else if (ret == UF_RET_CODE.UF_ERR_EXIST_ID) {
-                Log.e(TAG, "  Error Type: ID ALREADY EXISTS");
-            } else if (ret == UF_RET_CODE.UF_ERR_INVALID_PARAMETER) {
-                Log.e(TAG, "  Error Type: INVALID PARAMETER");
-            } else if (ret == UF_RET_CODE.UF_ERR_DATA_ERROR) {
-                Log.e(TAG, "  Error Type: DATA ERROR");
+                Log.w(TAG, "  ⊙ Template #" + (t+1) + " already exists");
             } else {
-                Log.e(TAG, "  Error Type: " + (ret != null ? ret.toString() : "UNKNOWN"));
+                Log.e(TAG, "  ✗ Template #" + (t+1) + " enrollment failed: " + ret);
+
+                if (ret == UF_RET_CODE.UF_ERR_TIME_OUT) {
+                    Log.e(TAG, "    Error Type: TIMEOUT");
+                } else if (ret == UF_RET_CODE.UF_ERR_INVALID_PARAMETER) {
+                    Log.e(TAG, "    Error Type: INVALID PARAMETER");
+                } else if (ret == UF_RET_CODE.UF_ERR_DATA_ERROR) {
+                    Log.e(TAG, "    Error Type: DATA ERROR");
+                } else {
+                    Log.e(TAG, "    Error Type: " + (ret != null ? ret.toString() : "UNKNOWN"));
+                }
             }
         }
 
-        return false;
+        boolean success = enrolledCount > 0;
+        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.d(TAG, "║ ENROLLMENT COMPLETE: " + (success ? "SUCCESS" : "FAILED"));
+        Log.d(TAG, "║ Enrolled: " + enrolledCount + " / " + templateCount);
+        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+
+        return success;
     }
 }

@@ -26,13 +26,10 @@ import androidx.cardview.widget.CardView;
 import com.supremainc.sfm_sdk_android.data.model.response.ApiResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileListItem;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse;
-import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
 import com.supremainc.sfm_sdk_android.data.model.response.VaultIncidentLog;
 import com.supremainc.sfm_sdk_android.network.api.ManualOverrideApiClient;
 import com.supremainc.sfm_sdk_android.network.api.VaultIncidentLogApiClient;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
-import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
-import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -41,7 +38,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.TimeZone;
 
 /**
  * Activity to display system activity logs
@@ -61,14 +57,13 @@ public class ActivityLogActivity extends AppCompatActivity {
 
     // Data
     private DatabaseHelper dbHelper;
-    private StaffEnrollmentService staffEnrollmentService;
     private VaultIncidentLogApiClient vaultIncidentLogApiClient;
     private ManualOverrideApiClient manualOverrideApiClient;
     private SimpleDateFormat iso8601Formatter;  // For parsing ISO-8601 from API
     private SimpleDateFormat displayDateFormatter;  // For displaying to user
 
     // Filter state
-    private String currentFilter = "ALL"; // ALL, ENROLLMENT, OVERRIDE, VAULT_INCIDENT
+    private String currentFilter = "ALL"; // ALL, OVERRIDE, VAULT_INCIDENT
 
     // Cache for loaded data
     private List<ActivityLogItem> allLogs = new ArrayList<>();
@@ -81,7 +76,6 @@ public class ActivityLogActivity extends AppCompatActivity {
 
         // Initialize services and formatters
         dbHelper = new DatabaseHelper(this);
-        staffEnrollmentService = new StaffEnrollmentService(this);
         vaultIncidentLogApiClient = new VaultIncidentLogApiClient(this);
         manualOverrideApiClient = new ManualOverrideApiClient(this);
 
@@ -120,9 +114,8 @@ public class ActivityLogActivity extends AppCompatActivity {
                 // Map spinner position to filter type
                 switch (position) {
                     case 0: currentFilter = "ALL"; break;
-                    case 1: currentFilter = "ENROLLMENT"; break;
-                    case 2: currentFilter = "OVERRIDE"; break;
-                    case 3: currentFilter = "VAULT_INCIDENT"; break;
+                    case 1: currentFilter = "OVERRIDE"; break;
+                    case 2: currentFilter = "VAULT_INCIDENT"; break;
                     default: currentFilter = "ALL";
                 }
                 loadActivityLogs();
@@ -154,13 +147,9 @@ public class ActivityLogActivity extends AppCompatActivity {
         final int[] pendingCalls = {0};
 
         // Determine which calls to make based on filter
-        boolean loadEnrollments = currentFilter.equals("ALL") || currentFilter.equals("ENROLLMENT");
         boolean loadOverrides = currentFilter.equals("ALL") || currentFilter.equals("OVERRIDE");
         boolean loadVaultIncidents = currentFilter.equals("ALL") || currentFilter.equals("VAULT_INCIDENT");
 
-        if (loadEnrollments) {
-            pendingCalls[0] += 2; // Admin + Custodian
-        }
         if (loadOverrides) {
             pendingCalls[0] += 1; // Override profiles from profiles-list
         }
@@ -181,83 +170,6 @@ public class ActivityLogActivity extends AppCompatActivity {
                 displayAllLogs();
             }
         };
-
-        // Load enrollment logs
-        if (loadEnrollments) {
-            // Get enrolled admins
-            staffEnrollmentService.getEnrolledAdminUsers(new StaffEnrollmentCallback() {
-                @Override
-                public void onPendingUsersRetrieved(List<UserListItem> users) {
-                    Log.i(TAG, "Retrieved " + users.size() + " enrolled admin(s)");
-                    for (UserListItem user : users) {
-                        ActivityLogItem logItem = new ActivityLogItem();
-                        logItem.type = "ENROLLMENT";
-                        logItem.title = "Admin Enrolled";
-                        logItem.description = user.getName() + " (" + user.getEmployeeNumber() + ")";
-                        logItem.timestamp = parseIso8601Timestamp(user.getCreatedAt());
-                        logItem.icon = "✓";
-                        logItem.userItem = user;
-                        allLogs.add(logItem);
-                    }
-                    checkComplete.run();
-                }
-
-                @Override
-                public void onEnrollmentError(String error) {
-                    Log.e(TAG, "Error loading admin enrollments: " + error);
-                    runOnUiThread(() -> Toast.makeText(ActivityLogActivity.this,
-                        "Error loading admin logs: " + error, Toast.LENGTH_SHORT).show());
-                    checkComplete.run();
-                }
-
-                @Override public void onEnrollmentSuccess(com.supremainc.sfm_sdk_android.data.model.response.EnrollUserResponse response) {}
-                @Override public void onUserValidated(UserListItem user) {}
-                @Override public void onUserNotFound() {}
-                @Override public void onUserDeleted() {}
-                @Override public void onFingerprintValidated(UserListItem user) {}
-                @Override public void onFingerprintNotFound() {}
-                @Override public void onSyncStarted(int totalFingerprints) {}
-                @Override public void onSyncProgress(int current, int total, String userName) {}
-                @Override public void onSyncCompleted(int successCount, int failCount) {}
-            });
-
-            // Get enrolled custodians
-            staffEnrollmentService.getEnrolledCustodianUsers(new StaffEnrollmentCallback() {
-                @Override
-                public void onPendingUsersRetrieved(List<UserListItem> users) {
-                    Log.i(TAG, "Retrieved " + users.size() + " enrolled custodian(s)");
-                    for (UserListItem user : users) {
-                        ActivityLogItem logItem = new ActivityLogItem();
-                        logItem.type = "ENROLLMENT";
-                        logItem.title = "Custodian Enrolled";
-                        logItem.description = user.getName() + " (" + user.getEmployeeNumber() + ")";
-                        logItem.timestamp = parseIso8601Timestamp(user.getCreatedAt());
-                        logItem.icon = "✓";
-                        logItem.userItem = user;
-                        allLogs.add(logItem);
-                    }
-                    checkComplete.run();
-                }
-
-                @Override
-                public void onEnrollmentError(String error) {
-                    Log.e(TAG, "Error loading custodian enrollments: " + error);
-                    runOnUiThread(() -> Toast.makeText(ActivityLogActivity.this,
-                        "Error loading custodian logs: " + error, Toast.LENGTH_SHORT).show());
-                    checkComplete.run();
-                }
-
-                @Override public void onEnrollmentSuccess(com.supremainc.sfm_sdk_android.data.model.response.EnrollUserResponse response) {}
-                @Override public void onUserValidated(UserListItem user) {}
-                @Override public void onUserNotFound() {}
-                @Override public void onUserDeleted() {}
-                @Override public void onFingerprintValidated(UserListItem user) {}
-                @Override public void onFingerprintNotFound() {}
-                @Override public void onSyncStarted(int totalFingerprints) {}
-                @Override public void onSyncProgress(int current, int total, String userName) {}
-                @Override public void onSyncCompleted(int successCount, int failCount) {}
-            });
-        }
 
         // Load override profile history
         if (loadOverrides) {
@@ -513,9 +425,7 @@ public class ActivityLogActivity extends AppCompatActivity {
 
         // Set different colors for different log types
         int badgeColor;
-        if (log.type.equals("ENROLLMENT")) {
-            badgeColor = getResources().getColor(R.color.holo_green_dark);
-        } else if (log.type.equals("OVERRIDE")) {
+        if (log.type.equals("OVERRIDE")) {
             badgeColor = getResources().getColor(R.color.colorAccent);
         } else if (log.type.equals("VAULT_INCIDENT")) {
             badgeColor = getResources().getColor(R.color.holo_orange_dark);
@@ -867,12 +777,11 @@ public class ActivityLogActivity extends AppCompatActivity {
      * Activity log item data class
      */
     private static class ActivityLogItem {
-        String type;        // ENROLLMENT, OVERRIDE, VAULT_INCIDENT
+        String type;        // OVERRIDE, VAULT_INCIDENT
         String title;
         String description;
         long timestamp;
         String icon;
-        UserListItem userItem; // For enrollment items
         ManualOverrideProfileResponse overrideProfile; // For full override profile items (not used currently)
         ManualOverrideProfileListItem overrideProfileListItem; // For override profile list items
         VaultIncidentLog vaultIncidentLog; // For vault incident log items

@@ -26,14 +26,14 @@ public class JsonParser {
         gson = new GsonBuilder()
                 .setDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
                 .serializeNulls()
-                .registerTypeAdapter(byte[].class, new Base64TypeAdapter())  // Handle Base64 strings
+                // No Base64 adapter needed - using templateDataByteArraysString (Arrays.toString format)
                 .create();
 
         // Pretty-printing version for debugging
         gsonPretty = new GsonBuilder()
                 .setDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
                 .serializeNulls()
-                .registerTypeAdapter(byte[].class, new Base64TypeAdapter())  // Handle Base64 strings
+                // No Base64 adapter needed - using templateDataByteArraysString (Arrays.toString format)
                 .setPrettyPrinting()
                 .create();
     }

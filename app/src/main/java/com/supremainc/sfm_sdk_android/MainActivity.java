@@ -518,8 +518,10 @@ public class MainActivity extends AppCompatActivity {
         ret = sdk.UF_SetMultiSysParameter(parameters_set.length, parameters_set, values_set);
         Log.d("UF_SetMultiSysParameter", ret.toString());
 
-        ret = sdk.UF_Save();
-        Log.d("UF_Save", ret.toString());
+        // UF_Save() removed - not used in PMOTamsNormal, not needed for basic operation
+        // Templates persist without explicit save in most cases
+        // ret = sdk.UF_Save();
+        // Log.d("UF_Save", ret.toString());
 
     }
 

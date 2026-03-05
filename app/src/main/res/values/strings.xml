@@ -102,7 +102,6 @@
     <!-- Activity Log Filters -->
     <string-array name="activity_log_filters">
         <item>All Logs</item>
-        <item>Enrollment History</item>
         <item>Override Profiles</item>
         <item>Vault Incident History</item>
     </string-array>

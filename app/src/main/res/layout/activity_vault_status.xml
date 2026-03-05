@@ -36,7 +36,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_weight="1"
-                android:text="Main Vault Status"
+                android:text="Vault Status"
                 android:textColor="@color/white"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -78,7 +78,7 @@
                     android:id="@+id/tvVaultTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Main Vault"
+                    android:text="Vault Status"
                     android:textColor="@color/white"
                     android:textSize="24sp"
                     android:textStyle="bold" />
@@ -96,17 +96,7 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Doors Section Title -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="Doors"
-            android:textColor="@color/textPrimary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <!-- Dynamic Door Cards Container -->
+        <!-- Dynamic Door Cards Container (category section headers are built in code) -->
         <LinearLayout
             android:id="@+id/doorCardsContainer"
             android:layout_width="match_parent"

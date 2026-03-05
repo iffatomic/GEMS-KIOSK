@@ -24,6 +24,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
 import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
+
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import android.os.Handler;
@@ -44,6 +46,7 @@ public class LoginActivity extends AppCompatActivity {
     private ExecutorService executor;
     private Handler mainHandler;
     private boolean isScanning = false;
+    private boolean isFirstResume = true; // Track if this is first onResume after onCreate
 
     // UI Components
     private EditText staffIdEditText, passwordEditText;
@@ -81,6 +84,9 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
+        // Hide system navigation bar for kiosk mode
+        hideSystemUI();
+
         // Initialize preferences and database
         languagePrefs = getSharedPreferences(LANGUAGE_PREF, MODE_PRIVATE);
         loginPrefs = getSharedPreferences(LOGIN_PREF, MODE_PRIVATE);
@@ -111,6 +117,13 @@ public class LoginActivity extends AppCompatActivity {
 
         // Setup click listeners
         setupClickListeners();
+
+        // START FINGERPRINT AUTO-SYNC SERVICE
+        // This ensures SignalR connection is active and listening for enrollment events
+        // Service will continue running in background even when navigating to other activities
+        Intent fingerprintSyncIntent = new Intent(this, com.supremainc.sfm_sdk_android.service.FingerprintAutoSyncService.class);
+        startService(fingerprintSyncIntent);
+        Log.d(TAG, "✓ Fingerprint Auto-Sync Service started - SignalR now listening for enrollment events");
     }
 
     // Add this method temporarily
@@ -425,9 +438,14 @@ public class LoginActivity extends AppCompatActivity {
         // Run fingerprint identification in background
         executor.execute(() -> {
             try {
+                // Cancel any previous operations first (PMOTamsNormal pattern)
+                sdk.UF_Cancel(false);
+                Thread.sleep(100); // Small delay after cancel
+
                 // Reconnect to scanner
                 sdk.UF_Reconnect();
-                Log.d(TAG, "Scanner reconnected");
+                Thread.sleep(200); // Delay for scanner to be ready
+                Log.d(TAG, "Scanner reconnected and ready");
 
                 // Diagnostic: Check how many templates are in scanner memory
                 int[] numTemplates = new int[1];
@@ -440,22 +458,47 @@ public class LoginActivity extends AppCompatActivity {
                 Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
                 if (numTemplates[0] == 0) {
-                    Log.e(TAG, "⚠ WARNING: Scanner has 0 templates! UF_Save() may have failed.");
-                    Log.e(TAG, "⚠ Templates were not persisted to flash memory.");
+                    Log.e(TAG, "⚠ WARNING: Scanner has 0 templates!");
+                    Log.e(TAG, "⚠ No fingerprints enrolled or scanner memory cleared.");
                 }
 
                 mainHandler.post(() -> {
                     fingerprintInstruction.setText("Scanning fingerprint...");
                 });
 
-                // Identify fingerprint
+                // Identify fingerprint (scans once)
                 int[] userID = new int[1];
                 byte[] subID = new byte[1];
 
-                Log.d(TAG, "Calling UF_Identify...");
-                UF_RET_CODE ret = sdk.UF_Identify(userID, subID);
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ SCANNING FINGERPRINT FOR VERIFICATION");
+                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ Place finger on scanner...");
+                Log.d(TAG, "║ Calling UF_Identify (single scan)...");
+                int[] numOfTemplate = new int[1];
+                byte[] templateData = new byte[3840];
+                int[] imageQuality = new int[1];
+                int[] templateSize = new int[1];
+                //ret = sdk.UF_ScanTemplate(templateData, templateSize, imageQuality);
+                //ret = sdk.UF_ReadTemplate(1, numOfTemplate, templateData);
+                //Log.d(TAG, "Test_Identify: Read Template : " + ret.toString());
 
-                Log.d(TAG, "UF_Identify returned: " + ret + ", Scanner ID: " + userID[0]);
+                UF_RET_CODE ret = sdk.UF_ScanTemplate(templateData, templateSize, imageQuality);
+                if (ret == UF_RET_CODE.UF_RET_SUCCESS){
+                    ret = sdk.UF_IdentifyTemplate(384, templateData, userID, subID);
+                    //ret = sdk.UF_IdentifyTemplate(384, templateData, userID, subID);
+                    //ret = sdk.UF_Identify(userID, subID);
+                    Log.d(TAG, "Test_Identify: IdentifyTemplate : " + ret.toString() + " User ID : " + userID[0] + " Sub ID : " + subID[0]);
+                }
+
+                //UF_RET_CODE ret = sdk.UF_Identify(userID, subID);
+
+                Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ IDENTIFICATION RESULT");
+                Log.d(TAG, "╠════════════════════════════════════════════════════════════");
+                Log.d(TAG, "║ Result: " + ret);
+                Log.d(TAG, "║ Scanner ID found: " + userID[0]);
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
                 mainHandler.post(() -> {
                     fingerprintInstruction.setText("Verifying identity...");
@@ -480,9 +523,19 @@ public class LoginActivity extends AppCompatActivity {
 
                     mainHandler.post(() -> {
                         fingerprintProgress.setVisibility(View.GONE);
+
+                        // Cancel scanner operation before marking as not scanning
+                        if (isScanning && sdk != null) {
+                            try {
+                                sdk.UF_Cancel(false);
+                                Log.d(TAG, "Scanner cancelled after identification");
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error cancelling scanner", e);
+                            }
+                        }
                         isScanning = false;
 
-                        // Handle regular user authentication
+                        // Handle regular user authenticatio
                         if (user != null) {
                             // SUCCESS! Login with this user (ignore role check for now)
                             Log.d(TAG, "User login successful: " + user.getName());
@@ -529,6 +582,16 @@ public class LoginActivity extends AppCompatActivity {
 
                     mainHandler.post(() -> {
                         fingerprintProgress.setVisibility(View.GONE);
+
+                        // Cancel scanner operation before marking as not scanning
+                        if (isScanning && sdk != null) {
+                            try {
+                                sdk.UF_Cancel(false);
+                                Log.d(TAG, "Scanner cancelled after failed identification");
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error cancelling scanner", e);
+                            }
+                        }
                         isScanning = false;
 
                         fingerprintInstruction.setText("❌ Fingerprint not recognized\nPlease try again");
@@ -543,6 +606,16 @@ public class LoginActivity extends AppCompatActivity {
 
                 mainHandler.post(() -> {
                     fingerprintProgress.setVisibility(View.GONE);
+
+                    // Cancel scanner operation before marking as not scanning
+                    if (isScanning && sdk != null) {
+                        try {
+                            sdk.UF_Cancel(false);
+                            Log.d(TAG, "Scanner cancelled after exception");
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Error cancelling scanner", ex);
+                        }
+                    }
                     isScanning = false;
 
                     fingerprintInstruction.setText("Error: " + e.getMessage());
@@ -612,5 +685,56 @@ public class LoginActivity extends AppCompatActivity {
             int currentPosition = getLanguagePosition(currentLanguage);
             languageSpinner.setSelection(currentPosition);
         }
+
+        // SIMPLIFIED: Port stays open (following PMOTamsNormal pattern)
+        // Just reconnect to clear any cached state
+        if (!isFirstResume && sdk != null) {
+            Log.d(TAG, "onResume: Reconnecting to scanner...");
+            new Thread(() -> {
+                try {
+                    sdk.UF_Reconnect(); // Clear cached module information
+                    Thread.sleep(200); // Small delay for stability
+                    Log.d(TAG, "✅ Scanner reconnected in onResume");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error reconnecting in onResume", e);
+                }
+            }).start();
+        } else if (isFirstResume) {
+            Log.d(TAG, "onResume: First resume - scanner already initialized");
+            isFirstResume = false;
+        }
+    }
+
+    /**
+     * Hide system navigation bar for kiosk mode
+     * User can still swipe up to show it, but it will hide again when window loses focus
+     */
+    private void hideSystemUI() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemUI();
+        }
+    }
+
+    /**
+     * Disable back button for kiosk mode
+     * Prevents users from exiting login screen accidentally
+     */
+    @Override
+    public void onBackPressed() {
+        // Do nothing - disable back button in kiosk mode
+        // Users must use fingerprint authentication or admin PIN to proceed
+        Log.d(TAG, "Back button pressed - disabled in kiosk mode");
     }
 }

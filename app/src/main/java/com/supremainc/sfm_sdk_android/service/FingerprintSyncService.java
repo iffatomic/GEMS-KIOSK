@@ -9,9 +9,8 @@ import android.content.Context;
 import android.util.Log;
 
 import com.supremainc.sfm_sdk_android.DatabaseHelper;
-import com.supremainc.sfm_sdk_android.data.model.response.AllFingerprintsResponse;
-import com.supremainc.sfm_sdk_android.data.model.response.ApiResponse;
-import com.supremainc.sfm_sdk_android.network.api.StaffEnrollmentApiClient;
+import com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse;
+import com.supremainc.sfm_sdk_android.network.api.FingerprintDownloadApiClient;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.utils.FingerprintUtils;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
@@ -41,7 +40,7 @@ public class FingerprintSyncService {
     private final Context context;
     private final DatabaseHelper dbHelper;
     private final SFM_SDK_ANDROID sdk;
-    private final StaffEnrollmentApiClient apiClient;
+    private final FingerprintDownloadApiClient apiClient;
     private final ExecutorService scannerExecutor;  // For scanner operations (must run on background thread)
 
     /**
@@ -58,7 +57,7 @@ public class FingerprintSyncService {
         this.context = context;
         this.dbHelper = new DatabaseHelper(context);
         this.sdk = sdk;
-        this.apiClient = new StaffEnrollmentApiClient(context);
+        this.apiClient = new FingerprintDownloadApiClient(context);
         this.scannerExecutor = Executors.newSingleThreadExecutor();  // Single thread for scanner operations
     }
 
@@ -110,21 +109,19 @@ public class FingerprintSyncService {
                 Log.d(TAG, "║ STEP 3: FETCHING FROM API");
                 Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-                apiClient.getAllFingerprints(new ApiCallback<ApiResponse<AllFingerprintsResponse>>() {
+                apiClient.getAllEmployeesWithFingerprints(new ApiCallback<AllEmployeesFingerprintsResponse>() {
                     @Override
-                    public void onSuccess(ApiResponse<AllFingerprintsResponse> response) {
-                        if (response.isFlag() && response.hasData()) {
-                            AllFingerprintsResponse data = response.getData();
-
+                    public void onSuccess(AllEmployeesFingerprintsResponse response) {
+                        if (response != null) {
                             Log.i(TAG, "✓ API call successful");
-                            Log.i(TAG, "  - Total fingerprints: " + data.getTotalFingerprints());
-                            Log.i(TAG, "  - Total users: " + (data.getUsers() != null ? data.getUsers().size() : 0));
+                            Log.i(TAG, "  - Total employees: " + response.getTotalEmployees());
+                            Log.i(TAG, "  - Total fingerprints: " + response.getTotalFingerprints());
 
                             // STEP 4 & 5: Process fingerprints (insert to DB, enroll to scanner)
-                            processAllFingerprints(data, callback);
+                            processAllFingerprints(response, callback);
 
                         } else {
-                            String error = "API returned error: " + response.getMessage();
+                            String error = "API returned null response";
                             Log.e(TAG, "✗ " + error);
                             if (callback != null) {
                                 callback.onSyncError(error);
@@ -180,21 +177,19 @@ public class FingerprintSyncService {
             Log.d(TAG, "║ FETCHING ALL FINGERPRINTS FROM API");
             Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-            apiClient.getAllFingerprints(new ApiCallback<ApiResponse<AllFingerprintsResponse>>() {
+            apiClient.getAllEmployeesWithFingerprints(new ApiCallback<AllEmployeesFingerprintsResponse>() {
                 @Override
-                public void onSuccess(ApiResponse<AllFingerprintsResponse> response) {
-                    if (response.isFlag() && response.hasData()) {
-                        AllFingerprintsResponse data = response.getData();
-
+                public void onSuccess(AllEmployeesFingerprintsResponse response) {
+                    if (response != null) {
                         Log.i(TAG, "✓ API call successful");
-                        Log.i(TAG, "  - Total fingerprints: " + data.getTotalFingerprints());
-                        Log.i(TAG, "  - Total users: " + (data.getUsers() != null ? data.getUsers().size() : 0));
+                        Log.i(TAG, "  - Total employees: " + response.getTotalEmployees());
+                        Log.i(TAG, "  - Total fingerprints: " + response.getTotalFingerprints());
 
                         // Process fingerprints incrementally (skip existing ones)
-                        processAllFingerprintsIncremental(data, callback);
+                        processAllFingerprintsIncremental(response, callback);
 
                     } else {
-                        String error = "API returned error: " + response.getMessage();
+                        String error = "API returned null response";
                         Log.e(TAG, "✗ " + error);
                         if (callback != null) {
                             callback.onSyncError(error);
@@ -215,10 +210,11 @@ public class FingerprintSyncService {
 
     /**
      * Process all fingerprints incrementally - skips already enrolled fingerprints
+     * NOW USING: FingerprintDownloadApi with templateDataString (LIKE SystemSettingsActivity!)
      */
-    private void processAllFingerprintsIncremental(AllFingerprintsResponse data, SyncCallback callback) {
-        if (data.getUsers() == null || data.getUsers().isEmpty()) {
-            Log.w(TAG, "No users with fingerprints found");
+    private void processAllFingerprintsIncremental(AllEmployeesFingerprintsResponse data, SyncCallback callback) {
+        if (data.getEmployees() == null || data.getEmployees().isEmpty()) {
+            Log.w(TAG, "No employees with fingerprints found");
             if (callback != null) {
                 callback.onSyncCompleted(0, 0);
             }
@@ -227,13 +223,13 @@ public class FingerprintSyncService {
 
         // Count total fingerprints
         int totalFingerprints = 0;
-        for (AllFingerprintsResponse.UserFingerprintData user : data.getUsers()) {
-            if (user.getFingerprints() != null) {
-                totalFingerprints += user.getFingerprints().size();
+        for (AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee : data.getEmployees()) {
+            if (employee.getFingerprints() != null) {
+                totalFingerprints += employee.getFingerprints().size();
             }
         }
 
-        Log.d(TAG, "Processing " + totalFingerprints + " fingerprints from " + data.getUsers().size() + " users");
+        Log.d(TAG, "Processing " + totalFingerprints + " fingerprints from " + data.getEmployees().size() + " employees");
 
         if (callback != null) {
             callback.onSyncStarted(totalFingerprints);
@@ -244,70 +240,68 @@ public class FingerprintSyncService {
         int failCount = 0;
         int current = 0;
 
-        // Process each user's fingerprints
-        for (AllFingerprintsResponse.UserFingerprintData user : data.getUsers()) {
-            if (user.getFingerprints() == null || user.getFingerprints().isEmpty()) {
+        // Process each employee's fingerprints
+        for (AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee : data.getEmployees()) {
+            if (employee.getFingerprints() == null || employee.getFingerprints().isEmpty()) {
                 continue;
             }
 
-            // OPTIMIZATION: Check once per user if they're enrolled locally
-            // If user exists in local users table with fingerprints, skip ALL their fingerprints from API sync
-            // This prevents duplicate enrollment (same user in both local and synced tables)
-            boolean isEnrolledLocally = dbHelper.isUserEnrolledLocally(user.getEmployeeNumber());
+            // OPTIMIZATION: Check once per employee if they're enrolled locally
+            // If employee exists in local users table with fingerprints, skip ALL their fingerprints from API sync
+            // This prevents duplicate enrollment (same employee in both local and synced tables)
+            boolean isEnrolledLocally = dbHelper.isUserEnrolledLocally(employee.getStaffID());
             if (isEnrolledLocally) {
-                Log.d(TAG, "  ⊘ Skipped user (already enrolled locally): " + user.getName() + " (" + user.getEmployeeNumber() + ") - " + user.getFingerprints().size() + " fingerprint(s)");
-                skippedCount += user.getFingerprints().size();
-                current += user.getFingerprints().size();
-                continue; // Skip all fingerprints for this user
+                Log.d(TAG, "  ⊘ Skipped employee (already enrolled locally): " + employee.getFullName() + " (" + employee.getStaffID() + ") - " + employee.getFingerprints().size() + " fingerprint(s)");
+                skippedCount += employee.getFingerprints().size();
+                current += employee.getFingerprints().size();
+                continue; // Skip all fingerprints for this employee
             }
 
-            for (AllFingerprintsResponse.FingerCredentialWithId fp : user.getFingerprints()) {
+            for (AllEmployeesFingerprintsResponse.FingerprintData fp : employee.getFingerprints()) {
                 current++;
 
                 try {
                     // Check if fingerprint already exists in synced_fingerprints table
-                    DatabaseHelper.SyncedFingerprint existing = dbHelper.getSyncedFingerprintByApiId(fp.getId());
+                    DatabaseHelper.SyncedFingerprint existing = dbHelper.getSyncedFingerprintByApiId(String.valueOf(fp.getId()));
 
                     if (existing != null && existing.isEnrolledToScanner()) {
                         // Already enrolled to synced range, skip
-                        Log.d(TAG, "  ⊘ Skipped (already synced): " + user.getName() + " - Scanner ID: " + existing.getScannerId());
+                        Log.d(TAG, "  ⊘ Skipped (already synced): " + employee.getFullName() + " - Scanner ID: " + existing.getScannerId());
                         skippedCount++;
                         continue;
                     }
 
-                    // Insert or update in database (gets scanner ID)
-                    // Decode Base64 string to byte array for database storage
-                    byte[] templateBytes = android.util.Base64.decode(
-                            fp.getFingerPrintBase64(),
-                            android.util.Base64.DEFAULT
-                    );
+                    // CRITICAL FIX: Use templateDataString directly (like SystemSettingsActivity!)
+                    // NO Base64 decoding needed!
+                    String templateString = fp.getTemplateDataString();
 
+                    if (templateString == null || templateString.isEmpty()) {
+                        Log.e(TAG, "✗ Empty template data for: " + employee.getFullName());
+                        failCount++;
+                        continue;
+                    }
+
+                    // Insert or update in database (gets scanner ID)
                     int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
-                            fp.getId(),
-                            user.getEmployeeNumber(),
-                            user.getUsername(),
-                            user.getName(),
-                            user.getRole(),
-                            templateBytes,  // Pass byte[] instead of Base64 string
+                            String.valueOf(fp.getId()),
+                            employee.getStaffID(),
+                            employee.getStaffID(),  // Username = StaffID
+                            employee.getFullName(),
+                            employee.getRole() != null ? employee.getRole() : "N/A",  // FIXED: Use role, not department!
+                            templateString,  // Pass template string DIRECTLY (no conversion needed!)
                             fp.getLeftRight(),
                             fp.getFingerIndex(),
-                            fp.getFingerType()
+                            String.valueOf(fp.getFingerType())
                     );
 
                     if (scannerId < 0) {
-                        Log.e(TAG, "✗ Failed to store in database: " + user.getName());
+                        Log.e(TAG, "✗ Failed to store in database: " + employee.getFullName());
                         failCount++;
                         continue;
                     }
 
-                    if (templateBytes == null || templateBytes.length == 0) {
-                        Log.e(TAG, "✗ Invalid template for: " + user.getName());
-                        failCount++;
-                        continue;
-                    }
-
-                    // Enroll to scanner
-                    boolean enrolled = enrollToScanner(scannerId, templateBytes, user.getName());
+                    // Enroll to scanner (enrollToScanner will parse the string and handle it properly)
+                    boolean enrolled = enrollToScanner(scannerId, null, employee.getFullName());
 
                     if (enrolled) {
                         // Mark as enrolled in database
@@ -315,17 +309,17 @@ public class FingerprintSyncService {
                         successCount++;
 
                         if (callback != null) {
-                            callback.onFingerprintEnrolled(current, totalFingerprints, user.getName());
+                            callback.onFingerprintEnrolled(current, totalFingerprints, employee.getFullName());
                         }
 
-                        Log.i(TAG, "✓ Enrolled: " + user.getName() + " (Scanner ID: " + scannerId + ")");
+                        Log.i(TAG, "✓ Enrolled: " + employee.getFullName() + " (Scanner ID: " + scannerId + ")");
                     } else {
                         failCount++;
-                        Log.e(TAG, "✗ Failed to enroll: " + user.getName());
+                        Log.e(TAG, "✗ Failed to enroll: " + employee.getFullName());
                     }
 
                 } catch (Exception e) {
-                    Log.e(TAG, "✗ Error processing: " + user.getName(), e);
+                    Log.e(TAG, "✗ Error processing: " + employee.getFullName(), e);
                     failCount++;
                 }
             }
@@ -407,11 +401,12 @@ public class FingerprintSyncService {
     }
 
     /**
-     * Process all fingerprints from API response
+     * Process all fingerprints from API response (TRUNCATE mode)
+     * NOW USING: FingerprintDownloadApi with templateDataString (LIKE SystemSettingsActivity!)
      */
-    private void processAllFingerprints(AllFingerprintsResponse data, SyncCallback callback) {
-        if (data.getUsers() == null || data.getUsers().isEmpty()) {
-            Log.w(TAG, "No users with fingerprints found");
+    private void processAllFingerprints(AllEmployeesFingerprintsResponse data, SyncCallback callback) {
+        if (data.getEmployees() == null || data.getEmployees().isEmpty()) {
+            Log.w(TAG, "No employees with fingerprints found");
             if (callback != null) {
                 callback.onSyncCompleted(0, 0);
             }
@@ -420,13 +415,13 @@ public class FingerprintSyncService {
 
         // Count total fingerprints
         int totalFingerprints = 0;
-        for (AllFingerprintsResponse.UserFingerprintData user : data.getUsers()) {
-            if (user.getFingerprints() != null) {
-                totalFingerprints += user.getFingerprints().size();
+        for (AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee : data.getEmployees()) {
+            if (employee.getFingerprints() != null) {
+                totalFingerprints += employee.getFingerprints().size();
             }
         }
 
-        Log.d(TAG, "Processing " + totalFingerprints + " fingerprints from " + data.getUsers().size() + " users");
+        Log.d(TAG, "Processing " + totalFingerprints + " fingerprints from " + data.getEmployees().size() + " employees");
 
         if (callback != null) {
             callback.onSyncStarted(totalFingerprints);
@@ -436,63 +431,60 @@ public class FingerprintSyncService {
         int failCount = 0;
         int current = 0;
 
-        // Process each user's fingerprints
-        for (AllFingerprintsResponse.UserFingerprintData user : data.getUsers()) {
-            if (user.getFingerprints() == null || user.getFingerprints().isEmpty()) {
+        // Process each employee's fingerprints
+        for (AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee : data.getEmployees()) {
+            if (employee.getFingerprints() == null || employee.getFingerprints().isEmpty()) {
                 continue;
             }
 
-            Log.d(TAG, "Processing user: " + user.getName() + " (" + user.getEmployeeNumber() + ")");
+            Log.d(TAG, "Processing employee: " + employee.getFullName() + " (" + employee.getStaffID() + ")");
 
-            for (AllFingerprintsResponse.FingerCredentialWithId fp : user.getFingerprints()) {
+            for (AllEmployeesFingerprintsResponse.FingerprintData fp : employee.getFingerprints()) {
                 current++;
 
                 try {
-                    // Decode Base64 string to byte array for database storage
-                    byte[] templateBytes = android.util.Base64.decode(
-                            fp.getFingerPrintBase64(),
-                            android.util.Base64.DEFAULT
-                    );
+                    // CRITICAL FIX: Use templateDataString directly (like SystemSettingsActivity!)
+                    // NO Base64 decoding needed!
+                    String templateString = fp.getTemplateDataString();
+
+                    if (templateString == null || templateString.isEmpty()) {
+                        Log.e(TAG, "✗ Empty template data for: " + employee.getFullName());
+                        failCount++;
+                        continue;
+                    }
 
                     // Step 1: Store in database and get assigned scanner ID
                     int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
-                            fp.getId(),                  // ULID string
-                            user.getEmployeeNumber(),
-                            user.getUsername(),
-                            user.getName(),
-                            user.getRole(),              // User role (ADMIN or CUSTODIAN)
-                            templateBytes,               // Pass byte[] instead of Base64 string
+                            String.valueOf(fp.getId()),
+                            employee.getStaffID(),
+                            employee.getStaffID(),  // Username = StaffID
+                            employee.getFullName(),
+                            employee.getRole() != null ? employee.getRole() : "N/A",  // FIXED: Use role, not department!
+                            templateString,  // Pass template string DIRECTLY (no conversion needed!)
                             fp.getLeftRight(),
                             fp.getFingerIndex(),
-                            fp.getFingerType()
+                            String.valueOf(fp.getFingerType())
                     );
 
                     if (scannerId < 0) {
-                        Log.e(TAG, "✗ Failed to store in database: " + user.getName());
+                        Log.e(TAG, "✗ Failed to store in database: " + employee.getFullName());
                         failCount++;
                         continue;
                     }
 
                     // OPTIMIZATION: Check if already enrolled to scanner
                     if (dbHelper.isSyncedFingerprintEnrolled(scannerId)) {
-                        Log.d(TAG, "⊙ Already enrolled: " + user.getName() + " (Scanner ID: " + scannerId + ") - SKIPPING");
+                        Log.d(TAG, "⊙ Already enrolled: " + employee.getFullName() + " (Scanner ID: " + scannerId + ") - SKIPPING");
                         successCount++;
 
                         if (callback != null) {
-                            callback.onFingerprintEnrolled(current, totalFingerprints, user.getName());
+                            callback.onFingerprintEnrolled(current, totalFingerprints, employee.getFullName());
                         }
                         continue;
                     }
 
-                    // Step 2: Validate template bytes
-                    if (templateBytes == null || templateBytes.length == 0) {
-                        Log.e(TAG, "✗ Invalid template for: " + user.getName());
-                        failCount++;
-                        continue;
-                    }
-
-                    // Step 3: Enroll to scanner using assigned scanner ID
-                    boolean enrolled = enrollToScanner(scannerId, templateBytes, user.getName());
+                    // Step 2: Enroll to scanner (enrollToScanner will read from database and handle properly)
+                    boolean enrolled = enrollToScanner(scannerId, null, employee.getFullName());
 
                     if (enrolled) {
                         // Mark as enrolled in database
@@ -500,23 +492,23 @@ public class FingerprintSyncService {
                         successCount++;
 
                         if (callback != null) {
-                            callback.onFingerprintEnrolled(current, totalFingerprints, user.getName());
+                            callback.onFingerprintEnrolled(current, totalFingerprints, employee.getFullName());
                         }
 
-                        Log.i(TAG, "✓ Enrolled: " + user.getName() + " (Scanner ID: " + scannerId + ", API ID: " + fp.getId() + ")");
+                        Log.i(TAG, "✓ Enrolled: " + employee.getFullName() + " (Scanner ID: " + scannerId + ", API ID: " + fp.getId() + ")");
                     } else {
                         failCount++;
-                        Log.e(TAG, "✗ Failed to enroll: " + user.getName());
+                        Log.e(TAG, "✗ Failed to enroll: " + employee.getFullName());
                     }
 
                 } catch (Exception e) {
-                    Log.e(TAG, "✗ Error processing: " + user.getName(), e);
+                    Log.e(TAG, "✗ Error processing: " + employee.getFullName(), e);
                     failCount++;
                 }
             }
         }
 
-        // Step 4: Fix provisional templates (like reference app)
+        // Step 3: Fix provisional templates (like reference app)
         sdk.UF_FixProvisionalTemplate();
 
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
@@ -533,49 +525,119 @@ public class FingerprintSyncService {
 
     /**
      * Enroll a fingerprint template to the scanner
-     * Based on reference app: SettingActivity.java line 326-370
+     * Based on SystemSettingsActivity.java (THE WORKING METHOD)
+     *
+     * CRITICAL: This method MUST match SystemSettingsActivity's exact approach:
+     * 1. Read template from database (database round-trip for verification)
+     * 2. LIMIT to FIRST 384 bytes only (API sends 768 bytes = 2 templates, we only enroll first)
+     * 3. Enroll using the limited template
      *
      * @param scannerId Integer scanner ID (auto-assigned by database)
-     * @param template Fingerprint template bytes
+     * @param template Fingerprint template bytes (may be 768 bytes, but we only use first 384)
      * @param name User name (for logging)
      * @return true if successful
      */
     private boolean enrollToScanner(int scannerId, byte[] template, String name) {
-        Log.d(TAG, "Enrolling to scanner: " + name + " (Scanner ID: " + scannerId + ")");
+        Log.d(TAG, "╔════════════════════════════════════════════════════════════");
+        Log.d(TAG, "║ Enrolling to scanner: " + name);
+        Log.d(TAG, "║ Scanner ID: " + scannerId);
+        if (template != null) {
+            Log.d(TAG, "║ Template size received: " + template.length + " bytes");
+        } else {
+            Log.d(TAG, "║ Template will be loaded from database");
+        }
+        Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
         try {
+            // STEP 1: Database round-trip (like SystemSettingsActivity does)
+            // Read template back from database to verify integrity
+            Log.d(TAG, "  → STEP 1: Database round-trip verification");
+            String templateStringFromDb = dbHelper.getTemplateDataByScannerId(scannerId);
+
+            if (templateStringFromDb == null || templateStringFromDb.isEmpty()) {
+                Log.e(TAG, "  ✗ Failed to read template from database");
+                return false;
+            }
+
+            Log.d(TAG, "  → DB string length: " + templateStringFromDb.length() + " chars");
+
+            byte[] templateBytesFromDb = DatabaseHelper.parseStringToByteArray(templateStringFromDb);
+
+            if (templateBytesFromDb == null || templateBytesFromDb.length == 0) {
+                Log.e(TAG, "  ✗ Failed to parse template from database");
+                return false;
+            }
+
+            Log.d(TAG, "  → Parsed from DB: " + templateBytesFromDb.length + " bytes");
+
+            // STEP 2: CRITICAL - Limit to FIRST 384 bytes only
+            // This is THE KEY DIFFERENCE that makes SystemSettingsActivity work!
+            // API sends 768 bytes (2 templates), but we only enroll the first 384 bytes
+            int STANDARD_TEMPLATE_SIZE = 384;
+            int enrollSize = Math.min(templateBytesFromDb.length, STANDARD_TEMPLATE_SIZE);
+
+            byte[] enrollTemplate = new byte[enrollSize];
+            System.arraycopy(templateBytesFromDb, 0, enrollTemplate, 0, enrollSize);
+
+            Log.d(TAG, "  → STEP 2: Limited to FIRST " + enrollSize + " bytes (standard size)");
+
+            // Log first 20 bytes for debugging
+            StringBuilder hexPreview = new StringBuilder();
+            for (int i = 0; i < Math.min(20, enrollTemplate.length); i++) {
+                hexPreview.append(String.format("%02X ", enrollTemplate[i]));
+            }
+            Log.d(TAG, "  → First 20 bytes (HEX): " + hexPreview.toString());
+
+            // STEP 3: Enroll to scanner
+            Log.d(TAG, "  → STEP 3: Enrolling to scanner hardware");
+
             int[] enrollID = new int[1];
             int[] templateSize = new int[1];
 
             enrollID[0] = 0;
-            templateSize[0] = template.length;
+            templateSize[0] = enrollSize;  // Use limited size (384 bytes)
 
             // Cancel any previous operations to ensure scanner is ready
             sdk.UF_Cancel(false);
-            Log.d(TAG, "  → UF_Cancel called before enrolling ID: " + scannerId);
+            Log.d(TAG, "  → UF_Cancel called");
 
-            // CRITICAL: Use assigned scanner ID
+            long startTime = System.currentTimeMillis();
+
+            // CRITICAL: Use assigned scanner ID and LIMITED template (384 bytes)
             UF_RET_CODE ret = sdk.UF_EnrollTemplate(
                     scannerId,                        // Use assigned scanner ID
                     UF_ENROLL_OPTION.UF_ENROLL_NONE,  // Don't auto-generate ID
-                    templateSize[0],
-                    template,
+                    templateSize[0],                  // 384 bytes (limited size)
+                    enrollTemplate,                   // LIMITED template (first 384 bytes)
                     enrollID
             );
 
+            long elapsed = System.currentTimeMillis() - startTime;
+            Log.d(TAG, "  → Enrollment completed in " + elapsed + "ms");
+            Log.d(TAG, "  → Result: " + ret);
+            Log.d(TAG, "  → Returned enrollID: " + enrollID[0]);
+
             if (ret == UF_RET_CODE.UF_RET_SUCCESS) {
-                Log.d(TAG, "  ✓ Enroll SUCCESS, scanner enrollID: " + enrollID[0]);
+                Log.d(TAG, "  ✓ Enroll SUCCESS");
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
                 return true;
+            } else if (ret == UF_RET_CODE.UF_ERR_EXIST_ID) {
+                Log.d(TAG, "  ⊙ Already enrolled (ID exists)");
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
+                return true;  // Treat as success
             } else if (ret == UF_RET_CODE.UF_ERR_TIME_OUT) {
                 Log.e(TAG, "  ✗ Enroll TIMEOUT");
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
                 return false;
             } else {
                 Log.e(TAG, "  ✗ Enroll FAILED: " + ret);
+                Log.d(TAG, "╚════════════════════════════════════════════════════════════");
                 return false;
             }
 
         } catch (Exception e) {
             Log.e(TAG, "  ✗ Exception during enroll", e);
+            Log.d(TAG, "╚════════════════════════════════════════════════════════════");
             return false;
         }
     }
@@ -679,82 +741,93 @@ public class FingerprintSyncService {
     }
 
     /**
-     * Sync fingerprints for a single user (incremental sync)
-     * Call this immediately after enrolling a user to make them available for verification
+     * Sync fingerprints for a single employee (incremental sync)
+     * Call this immediately after enrolling an employee to make them available for verification
      *
-     * @param employeeNumber Employee number of the newly enrolled user
+     * NEW APPROACH: Fetches ALL employees and filters for the specific employee
+     * This uses the same FingerprintDownloadApi endpoint as full sync
+     *
+     * @param employeeNumber Employee number of the newly enrolled employee
      * @param callback Progress callback (optional)
      */
     public void syncSingleUser(String employeeNumber, SyncCallback callback) {
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
-        Log.d(TAG, "║         INCREMENTAL SYNC - SINGLE USER                     ");
+        Log.d(TAG, "║         INCREMENTAL SYNC - SINGLE EMPLOYEE                 ");
         Log.d(TAG, "╠════════════════════════════════════════════════════════════");
         Log.d(TAG, "║ Employee Number: " + employeeNumber);
         Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-        apiClient.getFingerprintsByEmployeeNumber(employeeNumber,
-                new ApiCallback<ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.FingerprintCredentialsResponse>>() {
-            @Override
-            public void onSuccess(ApiResponse<com.supremainc.sfm_sdk_android.data.model.response.FingerprintCredentialsResponse> response) {
-                if (response.isFlag() && response.hasData()) {
-                    com.supremainc.sfm_sdk_android.data.model.response.FingerprintCredentialsResponse data = response.getData();
+        // Run on scanner executor (background thread)
+        scannerExecutor.execute(() -> {
+            Log.d(TAG, "  → Scanner thread: " + Thread.currentThread().getName());
 
-                    Log.i(TAG, "✓ API call successful");
-                    Log.i(TAG, "  - User: " + data.getName());
-                    Log.i(TAG, "  - Total fingerprints: " + data.getTotalFingerprints());
-                    Log.i(TAG, "  - Current thread: " + Thread.currentThread().getName());
+            apiClient.getAllEmployeesWithFingerprints(new ApiCallback<AllEmployeesFingerprintsResponse>() {
+                @Override
+                public void onSuccess(AllEmployeesFingerprintsResponse response) {
+                    if (response != null && response.getEmployees() != null) {
+                        Log.i(TAG, "✓ API call successful");
+                        Log.i(TAG, "  - Total employees in response: " + response.getTotalEmployees());
 
-                    // CRITICAL: Scanner operations MUST run on background thread, not network callback thread
-                    // Run on scanner executor to avoid crashes
-                    Log.d(TAG, "  → Switching to scanner executor thread for hardware operations");
-                    scannerExecutor.execute(() -> {
-                        try {
-                            Log.d(TAG, "  → Scanner thread: " + Thread.currentThread().getName());
-                            // Process this user's fingerprints
-                            processSingleUserFingerprints(data, callback);
-                        } catch (Exception e) {
-                            Log.e(TAG, "✗ Error in scanner thread: " + e.getMessage());
-                            e.printStackTrace();
-                            if (callback != null) {
-                                callback.onSyncError("Scanner error: " + e.getMessage());
+                        // Filter for the specific employee
+                        AllEmployeesFingerprintsResponse.EmployeeFingerprintData targetEmployee = null;
+                        for (AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee : response.getEmployees()) {
+                            if (employeeNumber.equals(employee.getStaffID())) {
+                                targetEmployee = employee;
+                                break;
                             }
                         }
-                    });
 
-                } else {
-                    String error = "API returned error: " + response.getMessage();
-                    Log.e(TAG, "✗ " + error);
-                    if (callback != null) {
-                        callback.onSyncError(error);
+                        if (targetEmployee == null) {
+                            String error = "Employee not found: " + employeeNumber;
+                            Log.e(TAG, "✗ " + error);
+                            if (callback != null) {
+                                callback.onSyncError(error);
+                            }
+                            return;
+                        }
+
+                        Log.i(TAG, "  - Found employee: " + targetEmployee.getFullName());
+                        Log.i(TAG, "  - Total fingerprints: " + (targetEmployee.getFingerprints() != null ? targetEmployee.getFingerprints().size() : 0));
+
+                        // Process this employee's fingerprints
+                        processSingleEmployeeFingerprints(targetEmployee, callback);
+
+                    } else {
+                        String error = "API returned null or empty response";
+                        Log.e(TAG, "✗ " + error);
+                        if (callback != null) {
+                            callback.onSyncError(error);
+                        }
                     }
                 }
-            }
 
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "✗ API call failed: " + error);
-                if (callback != null) {
-                    callback.onSyncError("Network error: " + error);
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "✗ API call failed: " + error);
+                    if (callback != null) {
+                        callback.onSyncError("Network error: " + error);
+                    }
                 }
-            }
+            });
         });
     }
 
     /**
-     * Process fingerprints for a single user
+     * Process fingerprints for a single employee
+     * NOW USING: templateDataString directly (LIKE SystemSettingsActivity!)
      */
-    private void processSingleUserFingerprints(com.supremainc.sfm_sdk_android.data.model.response.FingerprintCredentialsResponse data,
-                                                SyncCallback callback) {
-        if (data.getFingerprints() == null || data.getFingerprints().isEmpty()) {
-            Log.w(TAG, "No fingerprints found for user: " + data.getName());
+    private void processSingleEmployeeFingerprints(AllEmployeesFingerprintsResponse.EmployeeFingerprintData employee,
+                                                     SyncCallback callback) {
+        if (employee.getFingerprints() == null || employee.getFingerprints().isEmpty()) {
+            Log.w(TAG, "No fingerprints found for employee: " + employee.getFullName());
             if (callback != null) {
                 callback.onSyncCompleted(0, 0);
             }
             return;
         }
 
-        int totalFingerprints = data.getFingerprints().size();
-        Log.d(TAG, "Processing " + totalFingerprints + " fingerprint(s) for: " + data.getName());
+        int totalFingerprints = employee.getFingerprints().size();
+        Log.d(TAG, "Processing " + totalFingerprints + " fingerprint(s) for: " + employee.getFullName());
 
         if (callback != null) {
             callback.onSyncStarted(totalFingerprints);
@@ -765,44 +838,41 @@ public class FingerprintSyncService {
         int current = 0;
 
         // Process each fingerprint
-        for (com.supremainc.sfm_sdk_android.data.model.response.FingerprintCredentialsResponse.FingerCredentialWithId fp : data.getFingerprints()) {
+        for (AllEmployeesFingerprintsResponse.FingerprintData fp : employee.getFingerprints()) {
             current++;
 
             try {
-                // Decode Base64 string to byte array for database storage
-                byte[] templateBytes = android.util.Base64.decode(
-                        fp.getFingerPrintBase64(),
-                        android.util.Base64.DEFAULT
-                );
+                // CRITICAL FIX: Use templateDataString directly (like SystemSettingsActivity!)
+                // NO Base64 decoding needed!
+                String templateString = fp.getTemplateDataString();
+
+                if (templateString == null || templateString.isEmpty()) {
+                    Log.e(TAG, "✗ Empty template data for: " + employee.getFullName());
+                    failCount++;
+                    continue;
+                }
 
                 // Step 1: Store in database and get assigned scanner ID
                 int scannerId = dbHelper.insertOrUpdateSyncedFingerprint(
-                        fp.getId(),                  // ULID string
-                        data.getEmployeeNumber(),
-                        data.getUsername(),
-                        data.getName(),
-                        data.getRole(),              // User role (ADMIN or CUSTODIAN)
-                        templateBytes,               // Pass byte[] instead of Base64 string
+                        String.valueOf(fp.getId()),
+                        employee.getStaffID(),
+                        employee.getStaffID(),  // Username = StaffID
+                        employee.getFullName(),
+                        employee.getRole() != null ? employee.getRole() : "N/A",  // FIXED: Use role, not department!
+                        templateString,  // Pass template string DIRECTLY (no conversion needed!)
                         fp.getLeftRight(),
                         fp.getFingerIndex(),
-                        fp.getFingerType()
+                        String.valueOf(fp.getFingerType())
                 );
 
                 if (scannerId < 0) {
-                    Log.e(TAG, "✗ Failed to store in database: " + data.getName());
+                    Log.e(TAG, "✗ Failed to store in database: " + employee.getFullName());
                     failCount++;
                     continue;
                 }
 
-                // Step 2: Validate template bytes
-                if (templateBytes == null || templateBytes.length == 0) {
-                    Log.e(TAG, "✗ Invalid template for: " + data.getName());
-                    failCount++;
-                    continue;
-                }
-
-                // Step 3: Enroll to scanner using assigned scanner ID
-                boolean enrolled = enrollToScanner(scannerId, templateBytes, data.getName());
+                // Step 2: Enroll to scanner (enrollToScanner will read from database and handle properly)
+                boolean enrolled = enrollToScanner(scannerId, null, employee.getFullName());
 
                 if (enrolled) {
                     // Mark as enrolled in database
@@ -810,17 +880,17 @@ public class FingerprintSyncService {
                     successCount++;
 
                     if (callback != null) {
-                        callback.onFingerprintEnrolled(current, totalFingerprints, data.getName());
+                        callback.onFingerprintEnrolled(current, totalFingerprints, employee.getFullName());
                     }
 
-                    Log.i(TAG, "✓ Enrolled: " + data.getName() + " (Scanner ID: " + scannerId + ", API ID: " + fp.getId() + ")");
+                    Log.i(TAG, "✓ Enrolled: " + employee.getFullName() + " (Scanner ID: " + scannerId + ", API ID: " + fp.getId() + ")");
                 } else {
                     failCount++;
-                    Log.e(TAG, "✗ Failed to enroll: " + data.getName());
+                    Log.e(TAG, "✗ Failed to enroll: " + employee.getFullName());
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "✗ Error processing fingerprint for: " + data.getName(), e);
+                Log.e(TAG, "✗ Error processing fingerprint for: " + employee.getFullName(), e);
                 failCount++;
             }
         }
@@ -831,7 +901,7 @@ public class FingerprintSyncService {
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
         Log.d(TAG, "║         INCREMENTAL SYNC COMPLETE                          ");
         Log.d(TAG, "╠════════════════════════════════════════════════════════════");
-        Log.d(TAG, "║ User: " + data.getName());
+        Log.d(TAG, "║ Employee: " + employee.getFullName());
         Log.d(TAG, "║ Success: " + successCount);
         Log.d(TAG, "║ Failed: " + failCount);
         Log.d(TAG, "╚════════════════════════════════════════════════════════════");

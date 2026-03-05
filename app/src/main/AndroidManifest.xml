@@ -11,6 +11,7 @@
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
@@ -77,6 +78,24 @@
             android:name=".service.FingerprintAutoSyncService"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Key switch monitoring service for manual override profiles -->
+        <service
+            android:name=".service.KeySwitchMonitoringService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Boot Receiver to auto-start app on device boot (kiosk mode) -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

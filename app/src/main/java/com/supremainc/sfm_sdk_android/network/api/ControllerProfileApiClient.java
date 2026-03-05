@@ -16,7 +16,9 @@ import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.util.ApiConstants;
 
 import java.lang.reflect.Type;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * API client for controller profile operations
@@ -33,20 +35,24 @@ public class ControllerProfileApiClient {
     }
 
     /**
-     * Get all controller profiles
-     * GET /api/twincat/aws/controller-profiles
+     * Get all controller profiles with interimMode=false
+     * GET /api/twincat/aws/controller-profiles?interimMode=false
      * @param callback Response callback
      */
     public void getAllControllerProfiles(ApiCallback<List<ControllerProfileResponse>> callback) {
-        Log.d(TAG, "Getting all controller profiles");
+        Log.d(TAG, "Getting all controller profiles (interimMode=false)");
 
         // Define the response type for nested ApiResponse structure
-        // The API returns: { "success": true, "count": N, "data": [...], "timestamp": "..." }
+        // The API returns: { "success": true, "count": N, "data": [...], "interimMode": false, "timestamp": "..." }
         Type responseType = new TypeToken<ApiResponse<List<ControllerProfileResponse>>>(){}.getType();
+
+        // Add query parameter for interimMode=false
+        Map<String, String> queryParams = new HashMap<>();
+        queryParams.put("interimMode", "false");
 
         baseClient.get(
             ApiConstants.ENDPOINT_CONTROLLER_PROFILES,
-            null,  // No query parameters
+            queryParams,
             responseType,
             new ApiCallback<ApiResponse<List<ControllerProfileResponse>>>() {
                 @Override

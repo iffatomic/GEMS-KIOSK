@@ -84,7 +84,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- STEP 1: Vault Type Selection -->
+            <!-- STEP 1: Employee ID Input -->
             <LinearLayout
                 android:id="@+id/step1Container"
                 android:layout_width="match_parent"
@@ -98,7 +98,199 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    android:text="Step 1: Select Vault"
+                    android:text="Step 1: Enter Employee ID"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Enter your employee ID to begin"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+                <!-- Employee ID Input -->
+                <EditText
+                    android:id="@+id/etEmployeeId"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="16dp"
+                    android:hint="Employee ID"
+                    android:inputType="text"
+                    android:padding="16dp"
+                    android:background="@drawable/container_background"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary" />
+
+                <!-- Proceed Button -->
+                <Button
+                    android:id="@+id/btnProceedToFingerprint"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Proceed to Fingerprint"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/colorAccent"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- STEP 2: Fingerprint Authentication -->
+            <LinearLayout
+                android:id="@+id/step2Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Step 2: Authenticate with Fingerprint"
+                    android:textAlignment="center"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvEmployeeIdDisplay"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Employee ID: 12345"
+                    android:textAlignment="center"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp" />
+
+                <!-- Fingerprint Icon -->
+                <ImageView
+                    android:id="@+id/ivFingerprintIcon"
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="24dp"
+                    android:src="@drawable/fingerprint_icon"
+                    android:tint="@color/colorPrimary" />
+
+                <!-- Fingerprint Status Text -->
+                <TextView
+                    android:id="@+id/tvFingerprintStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="Tap button below to scan fingerprint"
+                    android:textAlignment="center"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp" />
+
+                <!-- Verified Employee Info (initially hidden) -->
+                <LinearLayout
+                    android:id="@+id/verifiedEmployeeContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:background="@drawable/container_background"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Verified Employee:"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12sp"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvVerifiedEmployeeName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Employee Name"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvVerifiedEmployeeId"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Staff ID: 12345"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+                <!-- Progress Bar -->
+                <ProgressBar
+                    android:id="@+id/fingerprintProgress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone" />
+
+                <!-- Scan Fingerprint Button -->
+                <Button
+                    android:id="@+id/btnScanFingerprint"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Scan Fingerprint"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/colorAccent"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- Proceed to Vault Selection Button (initially disabled) -->
+                <Button
+                    android:id="@+id/btnProceedToVaultSelection"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Proceed to Vault Selection"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:enabled="false" />
+
+                <!-- Back Button -->
+                <Button
+                    android:id="@+id/btnBackToEmployeeId"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="@color/textSecondary"
+                    android:text="Back"
+                    android:textColor="@color/white" />
+
+            </LinearLayout>
+
+            <!-- STEP 3: Vault/Door Selection -->
+            <LinearLayout
+                android:id="@+id/step3Container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/container_background"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Step 3: Select Vault/Door"
                     android:textAlignment="center"
                     android:textColor="@color/colorAccent"
                     android:textSize="20sp"
@@ -112,6 +304,25 @@
                     android:textAlignment="center"
                     android:textColor="@color/textSecondary"
                     android:textSize="14sp" />
+
+                <!-- Vault Category Dropdown -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Vault Category:"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spinnerVaultCategory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:background="#40FFFFFF"
+                    android:padding="12dp"
+                    android:spinnerMode="dropdown" />
 
                 <!-- Dynamic Vault Button Container -->
                 <LinearLayout
@@ -163,9 +374,9 @@
 
             </LinearLayout>
 
-            <!-- STEP 2: Entry Point Selection -->
+            <!-- STEP 4: Time Frame Selection -->
             <LinearLayout
-                android:id="@+id/step2Container"
+                android:id="@+id/step4Container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -178,113 +389,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    android:text="Step 2: Select Entry Point"
-                    android:textAlignment="center"
-                    android:textColor="@color/colorAccent"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvSelectedVault"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="24dp"
-                    android:text="Main Vault"
-                    android:textAlignment="center"
-                    android:textColor="@color/textSecondary"
-                    android:textSize="14sp" />
-
-                <!-- Main Grill Button -->
-                <Button
-                    android:id="@+id/btnMainGrill"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="Main Grill"
-                    android:textColor="@color/buttonText"
-                    android:backgroundTint="@color/buttonBackground"
-                    android:background="@drawable/container_background"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:elevation="1dp"
-                    android:gravity="center_vertical|start"
-                    android:paddingStart="20dp" />
-
-                <!-- Compartment 1 Button -->
-                <Button
-                    android:id="@+id/btnCompartment1"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="Compartment 1"
-                    android:textColor="@color/buttonText"
-                    android:backgroundTint="@color/buttonBackground"
-                    android:background="@drawable/container_background"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:elevation="1dp"
-                    android:gravity="center_vertical|start"
-                    android:paddingStart="20dp" />
-
-                <!-- Compartment 2 Button -->
-                <Button
-                    android:id="@+id/btnCompartment2"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="Compartment 2"
-                    android:textColor="@color/buttonText"
-                    android:backgroundTint="@color/buttonBackground"
-                    android:background="@drawable/container_background"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:elevation="1dp"
-                    android:gravity="center_vertical|start"
-                    android:paddingStart="20dp" />
-
-                <!-- Compartment 3 Button -->
-                <Button
-                    android:id="@+id/btnCompartment3"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginBottom="16dp"
-                    android:text="Compartment 3"
-                    android:textColor="@color/buttonText"
-                    android:backgroundTint="@color/buttonBackground"
-                    android:background="@drawable/container_background"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:elevation="1dp"
-                    android:gravity="center_vertical|start"
-                    android:paddingStart="20dp" />
-
-                <!-- Back Button -->
-                <Button
-                    android:id="@+id/btnBackToStep1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:backgroundTint="@color/textSecondary"
-                    android:text="Back"
-                    android:textColor="@color/white" />
-
-            </LinearLayout>
-
-            <!-- STEP 3: Time Frame Selection (NEW for GEMS Original) -->
-            <LinearLayout
-                android:id="@+id/step3Container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:background="@drawable/container_background"
-                android:orientation="vertical"
-                android:padding="24dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="Step 2: Set Time Frame"
+                    android:text="Step 4: Set Time Frame"
                     android:textAlignment="center"
                     android:textColor="@color/colorAccent"
                     android:textSize="20sp"
@@ -374,7 +479,7 @@
                     android:orientation="horizontal">
 
                     <Button
-                        android:id="@+id/btnBackToStep2"
+                        android:id="@+id/btnBackToStep3"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="8dp"
@@ -398,9 +503,9 @@
 
             </LinearLayout>
 
-            <!-- STEP 4: Key Switch Monitoring (NEW) -->
+            <!-- STEP 5: Key Switch Monitoring -->
             <LinearLayout
-                android:id="@+id/step4Container"
+                android:id="@+id/step5Container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -413,7 +518,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    android:text="Step 3: Turn Key Switches"
+                    android:text="Step 5: Turn Key Switches"
                     android:textAlignment="center"
                     android:textColor="@color/colorAccent"
                     android:textSize="20sp"
@@ -451,15 +556,31 @@
                     android:orientation="horizontal"
                     android:padding="16dp">
 
-                    <TextView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/circle_background"
-                        android:gravity="center"
-                        android:text="1"
-                        android:textColor="@color/white"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Key Status"
+                            android:textColor="@color/textSecondary"
+                            android:textSize="10sp"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/circle_background"
+                            android:gravity="center"
+                            android:text="1"
+                            android:textColor="@color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -490,9 +611,9 @@
                         android:id="@+id/ivKeySwitch1Icon"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:alpha="0.3"
+                        android:alpha="1.0"
                         android:src="@android:drawable/ic_lock_idle_lock"
-                        app:tint="@android:color/holo_red_dark" />
+                        app:tint="@android:color/holo_red_light" />
 
                 </LinearLayout>
 
@@ -507,15 +628,31 @@
                     android:orientation="horizontal"
                     android:padding="16dp">
 
-                    <TextView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/circle_background"
-                        android:gravity="center"
-                        android:text="2"
-                        android:textColor="@color/white"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Key Status"
+                            android:textColor="@color/textSecondary"
+                            android:textSize="10sp"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/circle_background"
+                            android:gravity="center"
+                            android:text="2"
+                            android:textColor="@color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -546,9 +683,9 @@
                         android:id="@+id/ivKeySwitch2Icon"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:alpha="0.3"
+                        android:alpha="1.0"
                         android:src="@android:drawable/ic_lock_idle_lock"
-                        app:tint="@android:color/holo_red_dark" />
+                        app:tint="@android:color/holo_red_light" />
 
                 </LinearLayout>
 
@@ -563,15 +700,31 @@
                     android:orientation="horizontal"
                     android:padding="16dp">
 
-                    <TextView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/circle_background"
-                        android:gravity="center"
-                        android:text="3"
-                        android:textColor="@color/white"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Key Status"
+                            android:textColor="@color/textSecondary"
+                            android:textSize="10sp"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/circle_background"
+                            android:gravity="center"
+                            android:text="3"
+                            android:textColor="@color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -602,9 +755,9 @@
                         android:id="@+id/ivKeySwitch3Icon"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:alpha="0.3"
+                        android:alpha="1.0"
                         android:src="@android:drawable/ic_lock_idle_lock"
-                        app:tint="@android:color/holo_red_dark" />
+                        app:tint="@android:color/holo_red_light" />
 
                 </LinearLayout>
 
@@ -640,9 +793,9 @@
 
             </LinearLayout>
 
-            <!-- STEP 5: Result Screen -->
+            <!-- STEP 6: Result Screen -->
             <LinearLayout
-                android:id="@+id/step5Container"
+                android:id="@+id/step6Container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
