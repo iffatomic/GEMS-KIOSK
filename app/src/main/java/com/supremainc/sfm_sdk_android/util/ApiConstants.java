@@ -46,6 +46,7 @@ public class ApiConstants {
 
     // Endpoints - Fingerprint Download (NEW - optimized endpoint for kiosk fingerprint sync)
     public static final String ENDPOINT_FINGERPRINT_DOWNLOAD = "/api/FingerprintDownload/employee-fingerprints";
+    public static final String ENDPOINT_FINGERPRINT_EMPLOYEE = "/api/FingerprintDownload/employee-fingerprints/";
 
     // Endpoints - Manual Override
     public static final String ENDPOINT_MANUAL_OVERRIDE = "/api/ManualOverride/profiles";
@@ -53,6 +54,7 @@ public class ApiConstants {
     public static final String ENDPOINT_ALL_PROFILES = "/api/ManualOverride/all-profiles";
     public static final String ENDPOINT_VALID_PROFILE = "/api/ManualOverride/valid-profile";
     public static final String ENDPOINT_PROFILES_LIST = "/api/ManualOverride/profiles-list";
+    public static final String ENDPOINT_MANUAL_OVERRIDE_CONFIG = "/api/ManualOverrideConfiguration";
 
     // Endpoints - Controller Profile (AWS Integration)
     public static final String ENDPOINT_CONTROLLER_PROFILES = "/api/twincat/aws/controller-profiles";

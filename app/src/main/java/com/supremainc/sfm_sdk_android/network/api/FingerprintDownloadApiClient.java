@@ -125,6 +125,45 @@ public class FingerprintDownloadApiClient {
     }
 
     /**
+     * Get a single employee's fingerprint data by employee number.
+     * GET /api/FingerprintDownload/employee-fingerprints/{employeeNumber}
+     *
+     * Used for a live isAllowedOverride check just before vault selection,
+     * so the app always uses the latest value from the server.
+     *
+     * @param employeeNumber Staff ID / employee number to look up
+     * @param callback Response callback with the employee's data
+     */
+    public void getEmployeeByNumber(String employeeNumber,
+            ApiCallback<AllEmployeesFingerprintsResponse.EmployeeFingerprintData> callback) {
+
+        Log.d(TAG, "Live override-permission check for employee: " + employeeNumber);
+
+        java.lang.reflect.Type responseType =
+            new TypeToken<AllEmployeesFingerprintsResponse.EmployeeFingerprintData>(){}.getType();
+
+        baseClient.get(
+            ApiConstants.ENDPOINT_FINGERPRINT_EMPLOYEE + employeeNumber,
+            null,
+            responseType,
+            new ApiCallback<AllEmployeesFingerprintsResponse.EmployeeFingerprintData>() {
+                @Override
+                public void onSuccess(AllEmployeesFingerprintsResponse.EmployeeFingerprintData response) {
+                    Log.d(TAG, "Live check result for " + employeeNumber
+                            + ": isAllowedOverride=" + response.isAllowedOverride());
+                    callback.onSuccess(response);
+                }
+
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "Live override check failed for " + employeeNumber + ": " + error);
+                    callback.onError(error);
+                }
+            }
+        );
+    }
+
+    /**
      * Convenience method that returns the response wrapped in ApiResponse format
      * This matches the pattern used by other API clients in the app
      *

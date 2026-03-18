@@ -12,6 +12,7 @@ import com.google.gson.reflect.TypeToken;
 import com.supremainc.sfm_sdk_android.PacApiClient;
 import com.supremainc.sfm_sdk_android.data.model.request.CreateManualOverrideProfileRequest;
 import com.supremainc.sfm_sdk_android.data.model.response.ApiResponse;
+import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideConfigurationResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileListItem;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
@@ -179,6 +180,37 @@ public class ManualOverrideApiClient {
                     callback.onError(error);
                 }
             });
+    }
+
+    /**
+     * Get all manual override configurations
+     * GET /api/ManualOverrideConfiguration
+     * Returns a list of configurations; one entry will have isDefault=true
+     * @param callback Response callback
+     */
+    public void getConfiguration(ApiCallback<List<ManualOverrideConfigurationResponse>> callback) {
+        Log.d(TAG, "Fetching manual override configuration list");
+
+        Type responseType = new TypeToken<List<ManualOverrideConfigurationResponse>>(){}.getType();
+
+        baseClient.get(
+            ApiConstants.ENDPOINT_MANUAL_OVERRIDE_CONFIG,
+            null,
+            responseType,
+            new ApiCallback<List<ManualOverrideConfigurationResponse>>() {
+                @Override
+                public void onSuccess(List<ManualOverrideConfigurationResponse> response) {
+                    Log.i(TAG, "Override config list loaded: " + (response != null ? response.size() : 0) + " items");
+                    callback.onSuccess(response);
+                }
+
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "Error fetching override config list: " + error);
+                    callback.onError(error);
+                }
+            }
+        );
     }
 
     /**

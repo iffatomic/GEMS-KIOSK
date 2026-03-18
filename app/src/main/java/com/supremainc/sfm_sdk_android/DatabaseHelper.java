@@ -34,7 +34,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     // Database configuration
     private static final String DATABASE_NAME = "FingerprintDB";
-    private static final int DATABASE_VERSION = 12;  // Updated to version 12 for TEXT template_data (Arrays.toString) in synced_fingerprints
+    private static final int DATABASE_VERSION = 13;  // Updated to version 13 for is_allowed_override column in synced_fingerprints
 
     // Table names
     private static final String TABLE_USERS = "users";
@@ -69,6 +69,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String KEY_SYNCED_FINGER_INDEX = "finger_index";       // 1-10
     private static final String KEY_SYNCED_FINGER_TYPE = "finger_type";         // "Thumb", "Index", etc.
     private static final String KEY_SYNCED_ENROLLED_TO_SCANNER = "enrolled_to_scanner"; // 1 if enrolled to scanner, 0 if not
+    private static final String KEY_SYNCED_IS_ALLOWED_OVERRIDE = "is_allowed_override"; // 1 if allowed to perform manual override, 0 if not
     private static final String KEY_SYNCED_AT = "synced_at";                    // When synced from API
 
     // Registered Personnel table columns
@@ -195,6 +196,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 + KEY_SYNCED_FINGER_INDEX + " INTEGER,"
                 + KEY_SYNCED_FINGER_TYPE + " TEXT,"
                 + KEY_SYNCED_ENROLLED_TO_SCANNER + " INTEGER DEFAULT 0,"
+                + KEY_SYNCED_IS_ALLOWED_OVERRIDE + " INTEGER DEFAULT 0,"
                 + KEY_SYNCED_AT + " DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ")";
 
@@ -403,6 +405,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 Log.d(TAG, "Successfully upgraded to version 10 - Added role column to synced_fingerprints");
             } catch (Exception e) {
                 Log.e(TAG, "Error upgrading to version 10", e);
+                recreateDatabase(db);
+            }
+        }
+
+        // Upgrade from version 12 to 13 (add is_allowed_override column to synced_fingerprints)
+        if (oldVersion < 13) {
+            try {
+                db.execSQL("ALTER TABLE " + TABLE_SYNCED_FINGERPRINTS + " ADD COLUMN " + KEY_SYNCED_IS_ALLOWED_OVERRIDE + " INTEGER DEFAULT 0");
+                Log.d(TAG, "Successfully upgraded to version 13 - Added is_allowed_override column to synced_fingerprints");
+            } catch (Exception e) {
+                Log.e(TAG, "Error upgrading to version 13", e);
                 recreateDatabase(db);
             }
         }
@@ -1673,7 +1686,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      * @return Scanner ID (integer) if successful, -1 if failed
      */
     public int insertOrUpdateSyncedFingerprint(String apiId, String employeeNumber, String username, String name,
-                                                 String role, String templateDataString, int leftRight, int fingerIndex, String fingerType) {
+                                                 String role, boolean isAllowedOverride, String templateDataString, int leftRight, int fingerIndex, String fingerType) {
         SQLiteDatabase db = this.getWritableDatabase();
 
         // Check if this API ID already exists
@@ -1694,6 +1707,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             values.put(KEY_SYNCED_USERNAME, username);
             values.put(KEY_SYNCED_NAME, name);
             values.put(KEY_SYNCED_ROLE, role);
+            values.put(KEY_SYNCED_IS_ALLOWED_OVERRIDE, isAllowedOverride ? 1 : 0);
             values.put(KEY_SYNCED_TEMPLATE_DATA, templateDataString);  // Store original string directly (unsigned format)
             values.put(KEY_SYNCED_LEFT_RIGHT, leftRight);
             values.put(KEY_SYNCED_FINGER_INDEX, fingerIndex);
@@ -1731,6 +1745,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             values.put(KEY_SYNCED_USERNAME, username);
             values.put(KEY_SYNCED_NAME, name);
             values.put(KEY_SYNCED_ROLE, role);
+            values.put(KEY_SYNCED_IS_ALLOWED_OVERRIDE, isAllowedOverride ? 1 : 0);
             values.put(KEY_SYNCED_TEMPLATE_DATA, templateDataString);  // Store original string directly (unsigned format)
             values.put(KEY_SYNCED_LEFT_RIGHT, leftRight);
             values.put(KEY_SYNCED_FINGER_INDEX, fingerIndex);
@@ -1812,6 +1827,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         Log.d(TAG, "Marked fingerprint Scanner ID " + scannerId + " as enrolled: " + (rowsAffected > 0));
         return rowsAffected > 0;
+    }
+
+    /**
+     * Update the is_allowed_override flag for all rows belonging to an employee number.
+     * Call this after a fresh API fetch to keep the local DB in sync without a full reset.
+     * @param employeeNumber Employee number whose rows should be updated
+     * @param isAllowed New value for is_allowed_override
+     * @return number of rows updated
+     */
+    public int updateIsAllowedOverrideByEmployeeNumber(String employeeNumber, boolean isAllowed) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(KEY_SYNCED_IS_ALLOWED_OVERRIDE, isAllowed ? 1 : 0);
+        int rowsAffected = db.update(TABLE_SYNCED_FINGERPRINTS, values,
+                KEY_SYNCED_EMPLOYEE_NUMBER + " = ?", new String[]{employeeNumber});
+        db.close();
+        Log.d(TAG, "updateIsAllowedOverride: employee=" + employeeNumber
+                + " isAllowed=" + isAllowed + " rows=" + rowsAffected);
+        return rowsAffected;
     }
 
     /**
@@ -2199,6 +2233,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         fp.setFingerIndex(getIntSafely(cursor, KEY_SYNCED_FINGER_INDEX));
         fp.setFingerType(getStringSafely(cursor, KEY_SYNCED_FINGER_TYPE));
         fp.setEnrolledToScanner(getIntSafely(cursor, KEY_SYNCED_ENROLLED_TO_SCANNER) == 1);
+        fp.setAllowedOverride(getIntSafely(cursor, KEY_SYNCED_IS_ALLOWED_OVERRIDE) == 1);
         fp.setSyncedAt(getStringSafely(cursor, KEY_SYNCED_AT));
         return fp;
     }
@@ -2537,6 +2572,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         private int fingerIndex;           // 1-10
         private String fingerType;         // "Thumb", "Index", etc.
         private boolean enrolledToScanner; // Whether enrolled to scanner
+        private boolean isAllowedOverride; // Whether this employee is permitted to perform manual override
         private String syncedAt;           // When synced from API
 
         // Getters and Setters
@@ -2575,6 +2611,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         public boolean isEnrolledToScanner() { return enrolledToScanner; }
         public void setEnrolledToScanner(boolean enrolledToScanner) { this.enrolledToScanner = enrolledToScanner; }
+
+        public boolean isAllowedOverride() { return isAllowedOverride; }
+        public void setAllowedOverride(boolean allowedOverride) { this.isAllowedOverride = allowedOverride; }
 
         public String getSyncedAt() { return syncedAt; }
         public void setSyncedAt(String syncedAt) { this.syncedAt = syncedAt; }

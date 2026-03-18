@@ -40,6 +40,7 @@ import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
 import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
 import com.supremainc.sfm_sdk_android.service.FingerprintAutoSyncService;
+import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 
 import android.util.Base64;
 
@@ -55,6 +56,7 @@ public class MainMenuActivity extends AppCompatActivity {
     // UI Components
     private Button btnFingerprintEnrollment, btnDeleteUser, btnActivateVault, btnSystemSettings,
             btnLogOut, btnInfo, btnManualOverride, btnMainVaultStatus, btnDayVaultStatus, btnActivityLog;
+    private android.widget.ImageButton btnSystemSettingsIcon;
     private Spinner languageSpinner;
     private TextView overrideCountBadge;
     private LinearLayout noOverridesMessage;
@@ -89,6 +91,15 @@ public class MainMenuActivity extends AppCompatActivity {
     // Handler for updating countdown timers
     private Handler updateHandler = new Handler();
     private Runnable updateRunnable;
+
+    // Inactivity timer
+    private Handler inactivityHandler = new Handler(Looper.getMainLooper());
+    private Runnable inactivityRunnable;
+
+    // Periodic update check — interval read from AppConfig.updateCheckIntervalMinutes
+    private Handler updateCheckHandler = new Handler(Looper.getMainLooper());
+    private Runnable updateCheckRunnable;
+    private boolean isUpdateDialogShowing = false;
 
     // Fingerprint SDK and verification
     private SFM_SDK_ANDROID sdk;
@@ -208,6 +219,7 @@ public class MainMenuActivity extends AppCompatActivity {
         noOverridesMessage = findViewById(R.id.noOverridesMessage);
         overrideCardsContainer = findViewById(R.id.overrideCardsContainer);
         btnViewMoreOverrides = findViewById(R.id.btnViewMoreOverrides);
+        btnSystemSettingsIcon = findViewById(R.id.btn_system_settings_icon);
     }
 
     private void setupLanguageSpinner() {
@@ -348,6 +360,13 @@ public class MainMenuActivity extends AppCompatActivity {
                 showToast(getString(R.string.system_settings) + " - Coming Soon");
             }
         });
+
+        if (btnSystemSettingsIcon != null) {
+            btnSystemSettingsIcon.setOnClickListener(v -> {
+                Intent intent = new Intent(MainMenuActivity.this, SystemSettingsActivity.class);
+                startActivity(intent);
+            });
+        }
 
         btnActivateVault.setOnClickListener(v -> {
             Intent intent = new Intent(MainMenuActivity.this, ActivateVaultActivity.class);
@@ -610,6 +629,11 @@ public class MainMenuActivity extends AppCompatActivity {
 
         // Refresh dashboard when returning to this activity
         refreshOverrideDashboard();
+
+        // Start inactivity timer
+        startInactivityTimer();
+        // Start periodic update check
+        startPeriodicUpdateCheck();
     }
 
     @Override
@@ -618,6 +642,41 @@ public class MainMenuActivity extends AppCompatActivity {
         // Stop updates when activity is not visible
         if (updateHandler != null && updateRunnable != null) {
             updateHandler.removeCallbacks(updateRunnable);
+        }
+        stopInactivityTimer();
+        stopPeriodicUpdateCheck();
+    }
+
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        resetInactivityTimer();
+    }
+
+    private void startInactivityTimer() {
+        int timeoutMinutes = com.supremainc.sfm_sdk_android.util.ConfigManager.getConfig().getInactivityTimeoutMinutes();
+        int clampedMinutes = Math.max(3, Math.min(5, timeoutMinutes));
+        long delayMs = clampedMinutes * 60 * 1000L;
+
+        stopInactivityTimer();
+        inactivityRunnable = () -> {
+            Log.d(TAG, "Inactivity timeout reached (" + clampedMinutes + " min) - logging out");
+            performLogout();
+        };
+        inactivityHandler.postDelayed(inactivityRunnable, delayMs);
+        Log.d(TAG, "Inactivity timer started: " + clampedMinutes + " minutes");
+    }
+
+    private void stopInactivityTimer() {
+        if (inactivityRunnable != null) {
+            inactivityHandler.removeCallbacks(inactivityRunnable);
+            inactivityRunnable = null;
+        }
+    }
+
+    private void resetInactivityTimer() {
+        if (inactivityRunnable != null) {
+            startInactivityTimer();
         }
     }
 
@@ -1035,12 +1094,55 @@ public class MainMenuActivity extends AppCompatActivity {
         });
     }
 
+    private void startPeriodicUpdateCheck() {
+        stopPeriodicUpdateCheck();
+        long intervalMs = AppUpdateManager.getCheckIntervalMs(this);
+        updateCheckRunnable = new Runnable() {
+            @Override
+            public void run() {
+                performUpdateCheck();
+                updateCheckHandler.postDelayed(this, AppUpdateManager.getCheckIntervalMs(MainMenuActivity.this));
+            }
+        };
+        updateCheckHandler.postDelayed(updateCheckRunnable, intervalMs);
+    }
+
+    private void stopPeriodicUpdateCheck() {
+        if (updateCheckRunnable != null) {
+            updateCheckHandler.removeCallbacks(updateCheckRunnable);
+            updateCheckRunnable = null;
+        }
+    }
+
+    private void performUpdateCheck() {
+        if (isUpdateDialogShowing) return;
+        executor.execute(() -> AppUpdateManager.checkForUpdate(this,
+                new AppUpdateManager.UpdateCheckCallback() {
+                    @Override
+                    public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
+                        runOnUiThread(() -> {
+                            if (!isFinishing() && !isUpdateDialogShowing) {
+                                isUpdateDialogShowing = true;
+                                AppUpdateManager.showUpdateDialog(MainMenuActivity.this, versionInfo, apkFile,
+                                        () -> isUpdateDialogShowing = false);
+                            }
+                        });
+                    }
+                    @Override public void onNoUpdateNeeded() {}
+                    @Override public void onCheckFailed(String error) {
+                        Log.d(TAG, "Periodic update check skipped: " + error);
+                    }
+                }));
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopPeriodicUpdateCheck();
         if (updateHandler != null && updateRunnable != null) {
             updateHandler.removeCallbacks(updateRunnable);
         }
+        stopInactivityTimer();
 
         // Clean up executor
         if (executor != null && !executor.isShutdown()) {

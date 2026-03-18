@@ -11,6 +11,8 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.card.MaterialCardView;
@@ -48,11 +50,12 @@ public class SystemSettingsActivity extends AppCompatActivity {
     private android.widget.EditText editSignalRPath;
     private android.widget.EditText editConnectTimeout;
     private android.widget.EditText editReadTimeout;
-    private androidx.appcompat.widget.SwitchCompat switchForceSetup;
-    private androidx.appcompat.widget.SwitchCompat switchDisableAdminVerification;
-    private androidx.appcompat.widget.SwitchCompat switchResetDatabaseFlag;
+    private android.widget.SeekBar seekbarInactivityTimeout;
+    private android.widget.TextView textInactivityTimeoutValue;
     private android.widget.Button btnSaveSettings;
     private android.widget.Button btnSaveAndRestart;
+    private android.widget.EditText editUpdateCheckInterval;
+    private LinearLayout checkUpdatesCard;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,14 +131,30 @@ public class SystemSettingsActivity extends AppCompatActivity {
         editConnectTimeout = findViewById(R.id.edit_connect_timeout);
         editReadTimeout = findViewById(R.id.edit_read_timeout);
 
-        // Testing flags switches
-        switchForceSetup = findViewById(R.id.switch_force_setup);
-        switchDisableAdminVerification = findViewById(R.id.switch_disable_admin_verification);
-        switchResetDatabaseFlag = findViewById(R.id.switch_reset_database_flag);
-
         // Save buttons
         btnSaveSettings = findViewById(R.id.btn_save_settings);
         btnSaveAndRestart = findViewById(R.id.btn_save_and_restart);
+
+        // Update check interval
+        editUpdateCheckInterval = findViewById(R.id.edit_update_check_interval);
+        checkUpdatesCard = findViewById(R.id.check_updates_card);
+
+        // Inactivity timeout
+        seekbarInactivityTimeout = findViewById(R.id.seekbar_inactivity_timeout);
+        textInactivityTimeoutValue = findViewById(R.id.text_inactivity_timeout_value);
+        if (seekbarInactivityTimeout != null) {
+            seekbarInactivityTimeout.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                    int minutes = progress + 3;
+                    if (textInactivityTimeoutValue != null) {
+                        textInactivityTimeoutValue.setText(minutes + " minutes");
+                    }
+                }
+                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+            });
+        }
 
         // Load current config values into UI
         loadConfigValues();
@@ -161,6 +180,34 @@ public class SystemSettingsActivity extends AppCompatActivity {
         syncFingerprintsCard.setOnClickListener(v -> {
             showSyncFingerprintsConfirmation();
         });
+
+        // Check for Updates Now card
+        if (checkUpdatesCard != null) {
+            checkUpdatesCard.setOnClickListener(v -> {
+                Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
+                executor.execute(() -> AppUpdateManager.checkForUpdate(this,
+                    new AppUpdateManager.UpdateCheckCallback() {
+                        @Override
+                        public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
+                            runOnUiThread(() -> {
+                                if (!isFinishing()) {
+                                    AppUpdateManager.showUpdateDialog(SystemSettingsActivity.this, versionInfo, apkFile, null);
+                                }
+                            });
+                        }
+                        @Override
+                        public void onNoUpdateNeeded() {
+                            runOnUiThread(() -> Toast.makeText(SystemSettingsActivity.this,
+                                    "App is up to date.", Toast.LENGTH_SHORT).show());
+                        }
+                        @Override
+                        public void onCheckFailed(String error) {
+                            runOnUiThread(() -> Toast.makeText(SystemSettingsActivity.this,
+                                    "Update check failed: " + error, Toast.LENGTH_LONG).show());
+                        }
+                    }));
+            });
+        }
     }
 
     /**
@@ -176,10 +223,15 @@ public class SystemSettingsActivity extends AppCompatActivity {
             editConnectTimeout.setText(String.valueOf(config.getConnectTimeoutMs()));
             editReadTimeout.setText(String.valueOf(config.getReadTimeoutMs()));
 
-            // Load testing flags
-            switchForceSetup.setChecked(config.getTestingFlags().isForceFirstTimeSetup());
-            switchDisableAdminVerification.setChecked(config.getTestingFlags().isDisableAdminVerification());
-            switchResetDatabaseFlag.setChecked(config.getTestingFlags().isResetDatabase());
+            // Load inactivity timeout (3-5 minutes, seekbar 0-2)
+            int timeoutMinutes = Math.max(3, Math.min(5, config.getInactivityTimeoutMinutes()));
+            if (seekbarInactivityTimeout != null) seekbarInactivityTimeout.setProgress(timeoutMinutes - 3);
+            if (textInactivityTimeoutValue != null) textInactivityTimeoutValue.setText(timeoutMinutes + " minutes");
+
+            // Load update check interval
+            if (editUpdateCheckInterval != null) {
+                editUpdateCheckInterval.setText(String.valueOf(config.getUpdateCheckIntervalMinutes()));
+            }
 
             Log.d(TAG, "Config values loaded successfully");
         } catch (Exception e) {
@@ -233,10 +285,22 @@ public class SystemSettingsActivity extends AppCompatActivity {
             config.setConnectTimeoutMs(connectTimeout);
             config.setReadTimeoutMs(readTimeout);
 
-            // Update testing flags
-            config.getTestingFlags().setForceFirstTimeSetup(switchForceSetup.isChecked());
-            config.getTestingFlags().setDisableAdminVerification(switchDisableAdminVerification.isChecked());
-            config.getTestingFlags().setResetDatabase(switchResetDatabaseFlag.isChecked());
+            // Update inactivity timeout
+            if (seekbarInactivityTimeout != null) {
+                config.setInactivityTimeoutMinutes(seekbarInactivityTimeout.getProgress() + 3);
+            }
+
+            // Update update check interval
+            if (editUpdateCheckInterval != null) {
+                String intervalStr = editUpdateCheckInterval.getText().toString().trim();
+                if (!intervalStr.isEmpty()) {
+                    try {
+                        config.setUpdateCheckIntervalMinutes(Integer.parseInt(intervalStr));
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "Invalid update interval, keeping default");
+                    }
+                }
+            }
 
             // Save to file
             boolean saved = com.supremainc.sfm_sdk_android.util.ConfigManager.saveConfig();
@@ -249,9 +313,8 @@ public class SystemSettingsActivity extends AppCompatActivity {
                 Log.d(TAG, "║ SignalR Path: " + signalRPath);
                 Log.d(TAG, "║ Connect Timeout: " + connectTimeout + "ms");
                 Log.d(TAG, "║ Read Timeout: " + readTimeout + "ms");
-                Log.d(TAG, "║ Force First Time Setup: " + switchForceSetup.isChecked());
-                Log.d(TAG, "║ Disable Admin Verification: " + switchDisableAdminVerification.isChecked());
-                Log.d(TAG, "║ Reset Database Flag: " + switchResetDatabaseFlag.isChecked());
+                Log.d(TAG, "║ Inactivity Timeout: " + config.getInactivityTimeoutMinutes() + " min");
+                Log.d(TAG, "║ Update Check Interval: " + config.getUpdateCheckIntervalMinutes() + " min");
                 Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
                 Toast.makeText(this, "✓ Settings saved successfully!\n\nRestart app for changes to take effect.", Toast.LENGTH_LONG).show();
@@ -311,10 +374,22 @@ public class SystemSettingsActivity extends AppCompatActivity {
             config.setConnectTimeoutMs(connectTimeout);
             config.setReadTimeoutMs(readTimeout);
 
-            // Update testing flags
-            config.getTestingFlags().setForceFirstTimeSetup(switchForceSetup.isChecked());
-            config.getTestingFlags().setDisableAdminVerification(switchDisableAdminVerification.isChecked());
-            config.getTestingFlags().setResetDatabase(switchResetDatabaseFlag.isChecked());
+            // Update inactivity timeout
+            if (seekbarInactivityTimeout != null) {
+                config.setInactivityTimeoutMinutes(seekbarInactivityTimeout.getProgress() + 3);
+            }
+
+            // Update update check interval
+            if (editUpdateCheckInterval != null) {
+                String intervalStr = editUpdateCheckInterval.getText().toString().trim();
+                if (!intervalStr.isEmpty()) {
+                    try {
+                        config.setUpdateCheckIntervalMinutes(Integer.parseInt(intervalStr));
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "Invalid update interval, keeping default");
+                    }
+                }
+            }
 
             // Save to file
             boolean saved = com.supremainc.sfm_sdk_android.util.ConfigManager.saveConfig();
@@ -327,9 +402,6 @@ public class SystemSettingsActivity extends AppCompatActivity {
                 Log.d(TAG, "║ SignalR Path: " + signalRPath);
                 Log.d(TAG, "║ Connect Timeout: " + connectTimeout + "ms");
                 Log.d(TAG, "║ Read Timeout: " + readTimeout + "ms");
-                Log.d(TAG, "║ Force First Time Setup: " + switchForceSetup.isChecked());
-                Log.d(TAG, "║ Disable Admin Verification: " + switchDisableAdminVerification.isChecked());
-                Log.d(TAG, "║ Reset Database Flag: " + switchResetDatabaseFlag.isChecked());
                 Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
                 Toast.makeText(this, "✓ Settings saved!\n\nRestarting app...", Toast.LENGTH_SHORT).show();
@@ -689,6 +761,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
                                 employee.getStaffID(),                      // Username (use staffID)
                                 employee.getFullName(),                     // Name
                                 employee.getRole() != null ? employee.getRole() : "N/A", // FIXED: Role (not department!)
+                                employee.isAllowedOverride(),               // Override permission from server
                                 templateString,                             // Original string from API (unsigned: "[69, 145, ...]")
                                 fingerprint.getLeftRight(),                 // 0=Left, 1=Right
                                 fingerprint.getFingerIndex(),               // 0-4 (Thumb to Little)

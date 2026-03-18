@@ -23,6 +23,7 @@ import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
 import com.supremainc.sfm_sdk_android.service.FingerprintAutoSyncService;
 import com.supremainc.sfm_sdk_android.util.ApiConstants;
 import com.supremainc.sfm_sdk_android.util.ConfigManager;
+import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
 import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
 
@@ -140,6 +141,51 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     /**
+     * Check for app updates first, then proceed with API connectivity check.
+     * If an update is available, shows a prompt before continuing.
+     */
+    private void navigateToNextScreen() {
+        // On Android 11+, MANAGE_EXTERNAL_STORAGE is required to read the FTP folder.
+        // If not granted, show a one-time dialog directing the user to Settings.
+        if (!AppUpdateManager.hasStoragePermission()) {
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("Storage Permission Required")
+                    .setMessage("To check for app updates from the FTP folder, please grant " +
+                            "\"All files access\" permission.\n\n" +
+                            "Settings → Apps → GEMS Kiosk → Permissions → Files and media → Allow management")
+                    .setCancelable(false)
+                    .setPositiveButton("Open Settings", (dialog, which) -> {
+                        AppUpdateManager.requestStoragePermission(this);
+                        // Proceed anyway — permission will be active next launch
+                        checkApiAndNavigate();
+                    })
+                    .setNegativeButton("Skip", (dialog, which) -> checkApiAndNavigate())
+                    .show();
+            return;
+        }
+
+        AppUpdateManager.checkForUpdate(this, new AppUpdateManager.UpdateCheckCallback() {
+            @Override
+            public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
+                Log.d(TAG, "Update available: v" + versionInfo.versionName);
+                AppUpdateManager.showUpdateDialog(SplashActivity.this, versionInfo, apkFile,
+                        () -> checkApiAndNavigate());
+            }
+
+            @Override
+            public void onNoUpdateNeeded() {
+                checkApiAndNavigate();
+            }
+
+            @Override
+            public void onCheckFailed(String error) {
+                Log.w(TAG, "Update check failed (proceeding): " + error);
+                checkApiAndNavigate();
+            }
+        });
+    }
+
+    /**
      * Check API connectivity and navigate to LoginActivity
      *
      * SIMPLIFIED FLOW:
@@ -147,7 +193,7 @@ public class SplashActivity extends AppCompatActivity {
      * - Show connection status via Toast (success/failure)
      * - Always navigate to LoginActivity for security
      */
-    private void navigateToNextScreen() {
+    private void checkApiAndNavigate() {
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
         Log.d(TAG, "║ SPLASH SCREEN - CHECKING API CONNECTION");
         Log.d(TAG, "╠════════════════════════════════════════════════════════════");

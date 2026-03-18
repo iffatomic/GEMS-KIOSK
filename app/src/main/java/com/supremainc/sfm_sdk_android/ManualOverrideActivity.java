@@ -26,10 +26,12 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.supremainc.sfm_sdk_android.data.model.response.ControllerProfileResponse;
+import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideConfigurationResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
 import com.supremainc.sfm_sdk_android.data.model.response.VaultInfo;
 import com.supremainc.sfm_sdk_android.network.api.ControllerProfileApiClient;
+import com.supremainc.sfm_sdk_android.network.api.FingerprintDownloadApiClient;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.ManualOverrideCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
@@ -103,6 +105,8 @@ public class ManualOverrideActivity extends AppCompatActivity {
     // Step 4: Time Frame Selection
     private TextView tvTimeFrameVaultDisplay;
     private TextView tvStartTime;
+    private Spinner spinnerOverrideDuration;
+    private TextView tvEndTimeLabel;
     private Button btnSelectEndTime;
     private TextView tvSelectedEndTime;
     private Button btnBackToStep3;
@@ -131,7 +135,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
 
     // Time frame tracking (NEW for GEMS Original)
     private long selectedEndTimeMillis = 0;  // Selected end time in milliseconds
-    private static final long MAX_OVERRIDE_DURATION_MS = 7L * 24 * 60 * 60 * 1000;  // 7 days in milliseconds
+    private int maxOverrideDurationDays = 7;  // Reflects selected configuration's max days
+    private List<ManualOverrideConfigurationResponse> overrideConfigurations = new ArrayList<>();
+    private ManualOverrideConfigurationResponse selectedConfiguration = null;
 
     // Key switch state tracking (NEW)
     private boolean keySwitch1On = false;
@@ -160,6 +166,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
     // API services
     private ManualOverrideService manualOverrideService;
     private ControllerProfileApiClient controllerProfileApiClient;
+    private FingerprintDownloadApiClient fingerprintDownloadApiClient;
 
     // SignalR service for real-time key switch events (NEW)
     private SignalRService signalRService;
@@ -179,6 +186,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
         mainHandler = new Handler(Looper.getMainLooper());
         manualOverrideService = new ManualOverrideService(this);
         controllerProfileApiClient = new ControllerProfileApiClient(this);
+        fingerprintDownloadApiClient = new FingerprintDownloadApiClient(this);
 
         // Initialize SDK (reuse from MainMenuActivity - scanner already initialized)
         sdk = new SFM_SDK_ANDROID();
@@ -189,6 +197,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
         initializeViews();
         setupListeners();
         loadVaultsFromApi();
+        loadOverrideConfiguration();
         showStep(1);
     }
 
@@ -289,6 +298,8 @@ public class ManualOverrideActivity extends AppCompatActivity {
         // Step 4: Time Frame Selection
         tvTimeFrameVaultDisplay = findViewById(R.id.tvTimeFrameVaultDisplay);
         tvStartTime = findViewById(R.id.tvStartTime);
+        spinnerOverrideDuration = findViewById(R.id.spinnerOverrideDuration);
+        tvEndTimeLabel = findViewById(R.id.tvEndTimeLabel);
         btnSelectEndTime = findViewById(R.id.btnSelectEndTime);
         tvSelectedEndTime = findViewById(R.id.tvSelectedEndTime);
         btnBackToStep3 = findViewById(R.id.btnBackToStep3);
@@ -337,7 +348,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
         btnScanFingerprint.setOnClickListener(v -> startFingerprintScan());
         btnProceedToVaultSelection.setOnClickListener(v -> {
             if (isFingerprintVerified) {
-                showStep(3);  // Proceed to vault selection
+                checkOverridePermissionThenProceed();
             } else {
                 Toast.makeText(this, "Please verify your fingerprint first", Toast.LENGTH_SHORT).show();
             }
@@ -472,6 +483,181 @@ public class ManualOverrideActivity extends AppCompatActivity {
     }
 
     /**
+     * Load manual override configuration list from server.
+     * Stored in overrideConfigurations; the RadioGroup in Step 4 is populated when that step is shown.
+     * Falls back gracefully if the API is unavailable (RadioGroup will be empty, default days used).
+     */
+    private void loadOverrideConfiguration() {
+        manualOverrideService.getOverrideConfiguration(new ApiCallback<List<ManualOverrideConfigurationResponse>>() {
+            @Override
+            public void onSuccess(List<ManualOverrideConfigurationResponse> configs) {
+                if (configs != null && !configs.isEmpty()) {
+                    overrideConfigurations = configs;
+                    Log.i(TAG, "Override config list loaded: " + configs.size() + " items");
+
+                    // Pre-select the default entry so maxOverrideDurationDays is ready
+                    for (ManualOverrideConfigurationResponse c : configs) {
+                        if (c.isDefault()) {
+                            selectedConfiguration = c;
+                            maxOverrideDurationDays = c.getMaxOverrideDurationDays();
+                            Log.i(TAG, "Default config: id=" + c.getId() + ", maxDays=" + maxOverrideDurationDays);
+                            break;
+                        }
+                    }
+                    // If no isDefault entry, fall back to first item
+                    if (selectedConfiguration == null) {
+                        selectedConfiguration = configs.get(0);
+                        maxOverrideDurationDays = selectedConfiguration.getMaxOverrideDurationDays();
+                        Log.w(TAG, "No default config found, using first item: maxDays=" + maxOverrideDurationDays);
+                    }
+                } else {
+                    Log.w(TAG, "Override config list is empty, keeping defaults");
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                Log.w(TAG, "Could not load override config list, using defaults: " + error);
+            }
+        });
+    }
+
+    /**
+     * Populate the Spinner in Step 4 with all available override configurations.
+     * Pre-selects the default entry (isDefault=true) or the previously chosen one.
+     */
+    private void populateConfigurationSelector() {
+        List<String> labels = new ArrayList<>();
+        int defaultPosition = 0;
+
+        if (overrideConfigurations.isEmpty()) {
+            labels.add("Default (" + maxOverrideDurationDays + " day(s))");
+        } else {
+            for (int i = 0; i < overrideConfigurations.size(); i++) {
+                ManualOverrideConfigurationResponse config = overrideConfigurations.get(i);
+                labels.add(config.getMaxOverrideDurationDays() + " day(s)" + (config.isDefault() ? "  (Default)" : ""));
+
+                boolean isCurrent = (selectedConfiguration != null && config.getId() == selectedConfiguration.getId())
+                        || (selectedConfiguration == null && config.isDefault());
+                if (isCurrent) {
+                    defaultPosition = i;
+                }
+            }
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerOverrideDuration.setAdapter(adapter);
+        spinnerOverrideDuration.setSelection(defaultPosition, false);
+
+        spinnerOverrideDuration.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (overrideConfigurations.isEmpty()) return;
+                ManualOverrideConfigurationResponse config = overrideConfigurations.get(position);
+                selectedConfiguration = config;
+                maxOverrideDurationDays = config.getMaxOverrideDurationDays();
+                tvEndTimeLabel.setText("End Time (Max " + maxOverrideDurationDays + " day(s)):");
+                // Reset end time when duration changes
+                selectedEndTimeMillis = 0;
+                tvSelectedEndTime.setText("Not selected");
+                tvSelectedEndTime.setTextColor(getResources().getColor(R.color.textSecondary));
+                btnProceedToVerification.setEnabled(false);
+                Log.d(TAG, "Override duration selected: " + maxOverrideDurationDays + " days");
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
+    /**
+     * Perform a live API check of isAllowedOverride before allowing the user to proceed
+     * to vault selection. Falls back to the cached DB value if the API is unreachable.
+     */
+    private void checkOverridePermissionThenProceed() {
+        String employeeNumber = (verifiedSyncedUser != null)
+                ? verifiedSyncedUser.getEmployeeNumber()
+                : (verifiedUser != null ? verifiedUser.getStaffId() : null);
+
+        if (employeeNumber == null) {
+            Toast.makeText(this, "Cannot verify permissions: employee not identified", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Disable button and show loading while checking
+        btnProceedToVaultSelection.setEnabled(false);
+        btnProceedToVaultSelection.setText("Checking permissions...");
+
+        fingerprintDownloadApiClient.getAllEmployeesWithFingerprints(
+            new ApiCallback<com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse>() {
+                @Override
+                public void onSuccess(com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse response) {
+                    // Find the employee in the fresh response
+                    com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse.EmployeeFingerprintData freshEmployee = null;
+                    if (response.getEmployees() != null) {
+                        for (com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse.EmployeeFingerprintData e : response.getEmployees()) {
+                            if (employeeNumber.equalsIgnoreCase(e.getStaffID())) {
+                                freshEmployee = e;
+                                break;
+                            }
+                        }
+                    }
+
+                    final boolean liveAllowed = (freshEmployee != null && freshEmployee.isAllowedOverride());
+
+                    // Persist fresh value to DB and in-memory object
+                    if (freshEmployee != null) {
+                        dbHelper.updateIsAllowedOverrideByEmployeeNumber(employeeNumber, liveAllowed);
+                        if (verifiedSyncedUser != null) verifiedSyncedUser.setAllowedOverride(liveAllowed);
+                    }
+
+                    runOnUiThread(() -> {
+                        btnProceedToVaultSelection.setEnabled(true);
+                        btnProceedToVaultSelection.setText("Proceed to Vault Selection");
+
+                        if (liveAllowed) {
+                            Log.i(TAG, "Live check: override ALLOWED for " + employeeNumber);
+                            showStep(3);
+                        } else {
+                            Log.w(TAG, "Live check: override DENIED for " + employeeNumber);
+                            tvFingerprintStatus.setText("❌ Override Not Permitted\n\nYour account is not authorised to perform manual vault override.");
+                            tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                            Toast.makeText(ManualOverrideActivity.this,
+                                "Access Denied: You are not authorised to perform manual override",
+                                Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    // API unreachable — fall back to cached DB value (already updated at fingerprint step if API was reachable then)
+                    Log.w(TAG, "Live override check failed, falling back to cached value: " + error);
+                    runOnUiThread(() -> {
+                        btnProceedToVaultSelection.setEnabled(true);
+                        btnProceedToVaultSelection.setText("Proceed to Vault Selection");
+
+                        boolean cachedAllowed = (verifiedSyncedUser != null && verifiedSyncedUser.isAllowedOverride());
+                        if (cachedAllowed) {
+                            Log.i(TAG, "Cached check: override ALLOWED for " + employeeNumber);
+                            showStep(3);
+                        } else {
+                            Log.w(TAG, "Cached check: override DENIED for " + employeeNumber);
+                            tvFingerprintStatus.setText("❌ Override Not Permitted\n\nYour account is not authorised to perform manual vault override.");
+                            tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                            Toast.makeText(ManualOverrideActivity.this,
+                                "Access Denied: You are not authorised to perform manual override",
+                                Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        );
+    }
+
+    /**
      * Dynamically create vault/door buttons from API data
      * Each controller profile represents a specific door
      */
@@ -598,7 +784,20 @@ public class ManualOverrideActivity extends AppCompatActivity {
         button.setOnClickListener(v -> {
             // Check if this door already has an active override
             if (isDoorAlreadyActivated(profile)) {
-                Toast.makeText(this, "This door has already been overridden.\nPlease deactivate it first.", Toast.LENGTH_LONG).show();
+                VaultOverrideManager.VaultOverride existing =
+                        VaultOverrideManager.getInstance(this).getVaultOverride(
+                                profile.getVaultName() != null && !profile.getVaultName().isEmpty()
+                                        ? profile.getVaultName()
+                                        : profile.getControllerVariableName());
+                String endMsg = "Please deactivate it first.";
+                if (existing != null && existing.endTimeMillis > 0) {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
+                            "dd MMM yyyy, hh:mm a", java.util.Locale.getDefault());
+                    endMsg = "Active until: " + sdf.format(new java.util.Date(existing.endTimeMillis))
+                            + "\nPlease deactivate it first.";
+                }
+                Toast.makeText(this, displayName + " is already overridden.\n" + endMsg,
+                        Toast.LENGTH_LONG).show();
                 return;
             }
 
@@ -699,6 +898,12 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 // Show current time as start time
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault());
                 tvStartTime.setText(sdf.format(new java.util.Date()));
+
+                // Populate the duration selector (rebuilds RadioButtons each time)
+                populateConfigurationSelector();
+
+                // Update end time label with current max duration
+                tvEndTimeLabel.setText("End Time (Max " + maxOverrideDurationDays + " day(s)):");
 
                 // Reset end time selection
                 selectedEndTimeMillis = 0;
@@ -1177,7 +1382,16 @@ public class ManualOverrideActivity extends AppCompatActivity {
      * Show date and time picker dialog for end time selection
      */
     private void showDateTimePicker() {
+        if (selectedConfiguration == null && overrideConfigurations.isEmpty()) {
+            // No configuration loaded yet — still usable with default maxOverrideDurationDays
+            Log.w(TAG, "No override configuration loaded, using default maxDays=" + maxOverrideDurationDays);
+        } else if (selectedConfiguration == null) {
+            Toast.makeText(this, "Please select an override duration first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         final java.util.Calendar calendar = java.util.Calendar.getInstance();
+        final long maxDurationMs = (long) maxOverrideDurationDays * 24 * 60 * 60 * 1000;
 
         // Show date picker first
         android.app.DatePickerDialog datePickerDialog = new android.app.DatePickerDialog(
@@ -1201,9 +1415,9 @@ public class ManualOverrideActivity extends AppCompatActivity {
                                     return;
                                 }
 
-                                // Validate: max 7 days
-                                if (durationMillis > MAX_OVERRIDE_DURATION_MS) {
-                                    Toast.makeText(this, "Maximum override duration is 7 days", Toast.LENGTH_SHORT).show();
+                                // Validate: must not exceed server-configured max duration
+                                if (durationMillis > maxDurationMs) {
+                                    Toast.makeText(this, "Maximum override duration is " + maxOverrideDurationDays + " day(s)", Toast.LENGTH_SHORT).show();
                                     return;
                                 }
 
@@ -1234,8 +1448,8 @@ public class ManualOverrideActivity extends AppCompatActivity {
         // Set minimum date to today
         datePickerDialog.getDatePicker().setMinDate(System.currentTimeMillis());
 
-        // Set maximum date to 7 days from now
-        datePickerDialog.getDatePicker().setMaxDate(System.currentTimeMillis() + MAX_OVERRIDE_DURATION_MS);
+        // Set maximum date based on server-configured max duration
+        datePickerDialog.getDatePicker().setMaxDate(System.currentTimeMillis() + maxDurationMs);
 
         datePickerDialog.show();
     }
@@ -1464,56 +1678,129 @@ public class ManualOverrideActivity extends AppCompatActivity {
                                 }
                                 Log.d(TAG, "╚════════════════════════════════════════════════════════════");
 
-                                // Note: Local users (finalUser from users table) don't have role field, so we allow them by default
+                                // STEP 2: Live API check for isAllowedOverride so stale DB values don't block
+                                // users whose permission was recently updated on the server.
+                                tvFingerprintStatus.setText("Fingerprint matched. Checking permissions...");
+                                tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.white));
 
-                                if (userRole != null && "CUSTODIAN".equalsIgnoreCase(userRole)) {
-                                    // REJECTED: Custodian role is not authorized for manual override
-                                    Log.w(TAG, "✗ AUTHORIZATION FAILED: Custodian role cannot perform manual override");
-                                    Log.w(TAG, "  → Employee: " + scannedEmployeeName + " (" + scannedStaffId + ")");
-                                    Log.w(TAG, "  → Role: " + userRole);
+                                String employeeNumberForCheck = (finalSyncedUser != null)
+                                        ? finalSyncedUser.getEmployeeNumber()
+                                        : (finalUser != null ? finalUser.getStaffId() : null);
 
-                                    tvFingerprintStatus.setText("❌ Authorization Failed\n\nCustodian role is not authorized to perform manual vault override.\n\nOnly Admin and other authorized roles can create override profiles.");
+                                final String finalUserRole = userRole;
+
+                                if (employeeNumberForCheck == null) {
+                                    Log.w(TAG, "✗ AUTHORIZATION FAILED: cannot determine employee number");
+                                    tvFingerprintStatus.setText("❌ Override Not Permitted\n\nCould not verify employee identity.");
                                     tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
-
-                                    Toast.makeText(ManualOverrideActivity.this,
-                                        "Access Denied: Custodian role cannot perform manual override",
-                                        Toast.LENGTH_LONG).show();
-
-                                    // Do NOT set verification flags - keep user blocked
                                     return;
                                 }
 
-                                // STEP 2: Role is authorized - proceed with verification
-                                isFingerprintVerified = true;
-                                verifiedUser = finalUser;
-                                verifiedSyncedUser = finalSyncedUser;
+                                // Use the same all-employees endpoint that reset-scanner uses — confirmed working.
+                                // The single-employee endpoint (/employee-fingerprints/{id}) may not exist on this backend.
+                                fingerprintDownloadApiClient.getAllEmployeesWithFingerprints(
+                                    new com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback<com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse>() {
+                                        @Override
+                                        public void onSuccess(com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse response) {
+                                            // Find this employee in the fresh response
+                                            com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse.EmployeeFingerprintData freshEmployee = null;
+                                            if (response.getEmployees() != null) {
+                                                for (com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse.EmployeeFingerprintData e : response.getEmployees()) {
+                                                    if (employeeNumberForCheck.equalsIgnoreCase(e.getStaffID())) {
+                                                        freshEmployee = e;
+                                                        break;
+                                                    }
+                                                }
+                                            }
 
-                                Log.i(TAG, "╔════════════════════════════════════════════════════════════");
-                                Log.i(TAG, "║ AUTHORIZATION CHECK PASSED");
-                                Log.i(TAG, "╠════════════════════════════════════════════════════════════");
-                                if (userRole != null) {
-                                    Log.i(TAG, "║ Role: '" + userRole + "'");
-                                    Log.i(TAG, "║ Authorization: ✓ GRANTED (non-Custodian role)");
-                                } else {
-                                    Log.i(TAG, "║ Role: N/A");
-                                    Log.i(TAG, "║ Authorization: ✓ GRANTED (local user - allowed by default)");
-                                }
-                                Log.i(TAG, "║ Employee can proceed with manual override");
-                                Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+                                            if (freshEmployee == null) {
+                                                Log.w(TAG, "Employee not found in fresh API response: " + employeeNumberForCheck);
+                                                runOnUiThread(() -> {
+                                                    tvFingerprintStatus.setText("❌ Employee not found in server data.\nPlease contact administrator.");
+                                                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                                                });
+                                                return;
+                                            }
 
-                                tvFingerprintStatus.setText("✓ Fingerprint Verified!");
-                                tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+                                            final boolean liveAllowed = freshEmployee.isAllowedOverride();
+                                            Log.d(TAG, "Live override check for " + employeeNumberForCheck + ": isAllowedOverride=" + liveAllowed);
 
-                                // Show verified employee info
-                                tvVerifiedEmployeeName.setText(scannedEmployeeName);
-                                tvVerifiedEmployeeId.setText("Staff ID: " + scannedStaffId);
-                                verifiedEmployeeContainer.setVisibility(View.VISIBLE);
+                                            // Persist the fresh value to DB so subsequent checks are also correct
+                                            dbHelper.updateIsAllowedOverrideByEmployeeNumber(employeeNumberForCheck, liveAllowed);
 
-                                // Enable proceed button
-                                btnProceedToVaultSelection.setEnabled(true);
-                                btnProceedToVaultSelection.setBackgroundTintList(getResources().getColorStateList(R.color.colorAccent));
+                                            // Update the in-memory object so the Proceed button fallback is also fresh
+                                            if (finalSyncedUser != null) finalSyncedUser.setAllowedOverride(liveAllowed);
 
-                                Toast.makeText(ManualOverrideActivity.this, "✓ Authenticated as " + scannedEmployeeName, Toast.LENGTH_SHORT).show();
+                                            runOnUiThread(() -> {
+                                                if (liveAllowed) {
+                                                    isFingerprintVerified = true;
+                                                    verifiedUser = finalUser;
+                                                    verifiedSyncedUser = finalSyncedUser;
+
+                                                    Log.i(TAG, "╔════════════════════════════════════════════════════════════");
+                                                    Log.i(TAG, "║ AUTHORIZATION CHECK PASSED (live)");
+                                                    Log.i(TAG, "╠════════════════════════════════════════════════════════════");
+                                                    Log.i(TAG, "║ Role: '" + finalUserRole + "'");
+                                                    Log.i(TAG, "║ Authorization: ✓ GRANTED");
+                                                    Log.i(TAG, "╚════════════════════════════════════════════════════════════");
+
+                                                    tvFingerprintStatus.setText("✓ Fingerprint Verified!");
+                                                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+
+                                                    tvVerifiedEmployeeName.setText(scannedEmployeeName);
+                                                    tvVerifiedEmployeeId.setText("Staff ID: " + scannedStaffId);
+                                                    verifiedEmployeeContainer.setVisibility(View.VISIBLE);
+
+                                                    btnProceedToVaultSelection.setEnabled(true);
+                                                    btnProceedToVaultSelection.setBackgroundTintList(getResources().getColorStateList(R.color.colorAccent));
+
+                                                    Toast.makeText(ManualOverrideActivity.this, "✓ Authenticated as " + scannedEmployeeName, Toast.LENGTH_SHORT).show();
+                                                } else {
+                                                    Log.w(TAG, "✗ AUTHORIZATION FAILED (live): isAllowedOverride=false for " + scannedEmployeeName);
+                                                    tvFingerprintStatus.setText("❌ Override Not Permitted\n\nYour account is not authorised to perform manual vault override.");
+                                                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                                                    Toast.makeText(ManualOverrideActivity.this,
+                                                        "Access Denied: You are not authorised to perform manual override",
+                                                        Toast.LENGTH_LONG).show();
+                                                }
+                                            });
+                                        }
+
+                                        @Override
+                                        public void onError(String error) {
+                                            // API unreachable — fall back to cached DB value
+                                            Log.w(TAG, "Live override check failed, falling back to cached DB value: " + error);
+                                            runOnUiThread(() -> {
+                                                boolean cachedAllowed = (finalSyncedUser != null && finalSyncedUser.isAllowedOverride());
+                                                if (cachedAllowed) {
+                                                    isFingerprintVerified = true;
+                                                    verifiedUser = finalUser;
+                                                    verifiedSyncedUser = finalSyncedUser;
+
+                                                    Log.i(TAG, "║ AUTHORIZATION CHECK PASSED (cached fallback)");
+                                                    tvFingerprintStatus.setText("✓ Fingerprint Verified!");
+                                                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+
+                                                    tvVerifiedEmployeeName.setText(scannedEmployeeName);
+                                                    tvVerifiedEmployeeId.setText("Staff ID: " + scannedStaffId);
+                                                    verifiedEmployeeContainer.setVisibility(View.VISIBLE);
+
+                                                    btnProceedToVaultSelection.setEnabled(true);
+                                                    btnProceedToVaultSelection.setBackgroundTintList(getResources().getColorStateList(R.color.colorAccent));
+
+                                                    Toast.makeText(ManualOverrideActivity.this, "✓ Authenticated as " + scannedEmployeeName, Toast.LENGTH_SHORT).show();
+                                                } else {
+                                                    Log.w(TAG, "✗ AUTHORIZATION FAILED (cached fallback): isAllowedOverride=false for " + scannedEmployeeName);
+                                                    tvFingerprintStatus.setText("❌ Override Not Permitted\n\nYour account is not authorised to perform manual vault override.");
+                                                    tvFingerprintStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                                                    Toast.makeText(ManualOverrideActivity.this,
+                                                        "Access Denied: You are not authorised to perform manual override",
+                                                        Toast.LENGTH_LONG).show();
+                                                }
+                                            });
+                                        }
+                                    }
+                                );
 
                             } else {
                                 // MISMATCH: Fingerprint does NOT match the entered employee ID

@@ -1,8 +1,10 @@
 {
-  "baseUrl": "http://192.2.2.169:7000",
+  "baseUrl": "http://192.168.4.29:7000",
   "connectTimeoutMs": 10000,
   "readTimeoutMs": 10000,
-  "signalRHubPath": "http://192.2.2.169:7000/eventHub",
+  "inactivityTimeoutMinutes": 5,
+  "updateCheckIntervalMinutes": 10,
+  "signalRHubPath": "http://192.168.4.29:7000/eventHub",
   "testingFlags": {
     "forceFirstTimeSetup": false,
     "disableAdminVerification": false,

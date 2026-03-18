@@ -102,6 +102,9 @@ public class AllEmployeesFingerprintsResponse {
         @SerializedName("isActive")
         private boolean isActive;
 
+        @SerializedName("isAllowedOverride")
+        private boolean isAllowedOverride;
+
         @SerializedName("fingerprints")
         private List<FingerprintData> fingerprints;
 
@@ -189,6 +192,14 @@ public class AllEmployeesFingerprintsResponse {
 
         public void setActive(boolean active) {
             isActive = active;
+        }
+
+        public boolean isAllowedOverride() {
+            return isAllowedOverride;
+        }
+
+        public void setAllowedOverride(boolean allowedOverride) {
+            isAllowedOverride = allowedOverride;
         }
 
         public List<FingerprintData> getFingerprints() {

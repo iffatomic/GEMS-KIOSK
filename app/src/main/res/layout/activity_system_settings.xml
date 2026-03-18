@@ -243,7 +243,7 @@
 
             </LinearLayout>
 
-            <!-- Testing Flags Section -->
+            <!-- Inactivity Timeout Section -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -256,124 +256,126 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🧪 Testing &amp; Debug Flags"
+                    android:text="Inactivity Timeout"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Auto-logout after no activity (3–5 minutes)"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Force First Time Setup -->
-                <LinearLayout
+                <SeekBar
+                    android:id="@+id/seekbar_inactivity_timeout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="12dp">
+                    android:max="2"
+                    android:layout_marginBottom="8dp" />
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                <TextView
+                    android:id="@+id/text_inactivity_timeout_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="5 minutes"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    android:layout_gravity="center_horizontal" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Force First Time Setup"
-                            android:textSize="14sp"
-                            android:textColor="@color/textPrimary"
-                            android:textStyle="bold" />
+            </LinearLayout>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Show initial setup wizard on next launch"
-                            android:textSize="12sp"
-                            android:textColor="@color/textSecondary" />
+            <!-- App Update Settings Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/container_background"
+                android:padding="20dp"
+                android:layout_marginBottom="16dp"
+                android:elevation="2dp">
 
-                    </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App Updates"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
 
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switch_force_setup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="How often to check for APK updates in the Ftp folder"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:layout_marginBottom="16dp" />
 
-                </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Check Interval (minutes)"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
 
-                <!-- Disable Admin Verification -->
-                <LinearLayout
+                <EditText
+                    android:id="@+id/edit_update_check_interval"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="12dp">
+                    android:hint="10"
+                    android:inputType="number"
+                    android:textColor="@color/textPrimary"
+                    android:textColorHint="@color/textSecondary"
+                    android:background="@drawable/edittext_background"
+                    android:padding="12dp" />
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+            </LinearLayout>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Disable Admin Verification"
-                            android:textSize="14sp"
-                            android:textColor="@color/textPrimary"
-                            android:textStyle="bold" />
+            <!-- Check for Updates Now Card -->
+            <LinearLayout
+                android:id="@+id/check_updates_card"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:orientation="vertical"
+                android:background="@drawable/container_background"
+                android:padding="20dp"
+                android:elevation="2dp"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginBottom="16dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Skip fingerprint verification for admin functions"
-                            android:textSize="12sp"
-                            android:textColor="@color/textSecondary" />
-
-                    </LinearLayout>
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switch_disable_admin_verification"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-
-                </LinearLayout>
-
-                <!-- Reset Database on Launch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:text="⬆️"
+                    android:textSize="32sp"
+                    android:layout_marginBottom="8dp" />
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Check for Updates Now"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Reset Database on Launch"
-                            android:textSize="14sp"
-                            android:textColor="@color/textPrimary"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Automatically reset database when app starts"
-                            android:textSize="12sp"
-                            android:textColor="@color/textSecondary" />
-
-                    </LinearLayout>
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switch_reset_database_flag"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-
-                </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Manually scan the Ftp folder for a new APK"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:gravity="center"
+                    android:textAlignment="center" />
 
             </LinearLayout>
 

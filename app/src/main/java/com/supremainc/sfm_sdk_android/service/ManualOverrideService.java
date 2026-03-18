@@ -9,6 +9,7 @@ import android.content.Context;
 import android.util.Log;
 
 import com.supremainc.sfm_sdk_android.data.model.request.CreateManualOverrideProfileRequest;
+import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideConfigurationResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileListItem;
 import com.supremainc.sfm_sdk_android.dto.common.DateTimeHelper;
 import com.supremainc.sfm_sdk_android.network.api.ManualOverrideApiClient;
@@ -189,5 +190,15 @@ public class ManualOverrideService {
     public void getAllProfilesList(ApiCallback<List<ManualOverrideProfileListItem>> callback) {
         Log.d(TAG, "Fetching all profiles list");
         apiClient.getProfilesList(callback);
+    }
+
+    /**
+     * Get manual override configuration list from server
+     * Each entry has maxOverrideDurationDays and isDefault flag
+     * @param callback Response callback
+     */
+    public void getOverrideConfiguration(ApiCallback<java.util.List<ManualOverrideConfigurationResponse>> callback) {
+        Log.d(TAG, "Fetching manual override configuration list");
+        apiClient.getConfiguration(callback);
     }
 }

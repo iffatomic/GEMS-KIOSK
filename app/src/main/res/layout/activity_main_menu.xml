@@ -55,6 +55,16 @@
             android:gravity="center"
             android:layout_marginHorizontal="16dp" />
 
+        <ImageButton
+            android:id="@+id/btn_system_settings_icon"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="System Settings"
+            android:padding="10dp"
+            android:src="@drawable/outline_settings_24"
+            android:tint="@color/white" />
+
         <LinearLayout
             android:id="@+id/language_container"
             android:layout_width="wrap_content"

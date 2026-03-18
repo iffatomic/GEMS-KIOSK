@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Covers /storage/emulated/0/Ftp/ (Material Files FTP directory) -->
+    <external-path name="ftp_updates" path="Ftp/" />
+</paths>

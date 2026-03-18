@@ -31,6 +31,12 @@ public class AppConfig {
     // SignalR Event Names
     private SignalREvents signalREvents = new SignalREvents();
 
+    // Inactivity Timeout (minutes, min 3, max 5, default 5)
+    private int inactivityTimeoutMinutes = 5;
+
+    // Update check interval (minutes, min 1, default 10)
+    private int updateCheckIntervalMinutes = 10;
+
     // Testing Flags
     private TestingFlags testingFlags = new TestingFlags();
 
@@ -143,6 +149,16 @@ public class AppConfig {
     public void setTestingFlags(TestingFlags testingFlags) { this.testingFlags = testingFlags; }
 
     // Helper method to get full SignalR URL
+    public int getInactivityTimeoutMinutes() { return inactivityTimeoutMinutes; }
+    public void setInactivityTimeoutMinutes(int minutes) {
+        this.inactivityTimeoutMinutes = Math.max(3, Math.min(5, minutes));
+    }
+
+    public int getUpdateCheckIntervalMinutes() { return updateCheckIntervalMinutes; }
+    public void setUpdateCheckIntervalMinutes(int minutes) {
+        this.updateCheckIntervalMinutes = Math.max(1, minutes);
+    }
+
     public String getSignalRHubUrl() {
         return baseUrl + signalRHubPath;
     }

@@ -24,6 +24,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
 import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
+import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +47,12 @@ public class LoginActivity extends AppCompatActivity {
     private ExecutorService executor;
     private Handler mainHandler;
     private boolean isScanning = false;
-    private boolean isFirstResume = true; // Track if this is first onResume after onCreate
+    private boolean isFirstResume = true;
+
+    // Periodic update check — interval read from AppConfig.updateCheckIntervalMinutes
+    private Handler updateCheckHandler = new Handler(Looper.getMainLooper());
+    private Runnable updateCheckRunnable;
+    private boolean isUpdateDialogShowing = false;
 
     // UI Components
     private EditText staffIdEditText, passwordEditText;
@@ -658,9 +664,51 @@ public class LoginActivity extends AppCompatActivity {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
+    private void startPeriodicUpdateCheck() {
+        stopPeriodicUpdateCheck();
+        long intervalMs = AppUpdateManager.getCheckIntervalMs(this);
+        updateCheckRunnable = new Runnable() {
+            @Override
+            public void run() {
+                performUpdateCheck();
+                updateCheckHandler.postDelayed(this, AppUpdateManager.getCheckIntervalMs(LoginActivity.this));
+            }
+        };
+        updateCheckHandler.postDelayed(updateCheckRunnable, intervalMs);
+    }
+
+    private void stopPeriodicUpdateCheck() {
+        if (updateCheckRunnable != null) {
+            updateCheckHandler.removeCallbacks(updateCheckRunnable);
+            updateCheckRunnable = null;
+        }
+    }
+
+    private void performUpdateCheck() {
+        if (isUpdateDialogShowing) return;
+        executor.execute(() -> AppUpdateManager.checkForUpdate(this,
+                new AppUpdateManager.UpdateCheckCallback() {
+                    @Override
+                    public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
+                        runOnUiThread(() -> {
+                            if (!isFinishing() && !isUpdateDialogShowing) {
+                                isUpdateDialogShowing = true;
+                                AppUpdateManager.showUpdateDialog(LoginActivity.this, versionInfo, apkFile,
+                                        () -> isUpdateDialogShowing = false);
+                            }
+                        });
+                    }
+                    @Override public void onNoUpdateNeeded() {}
+                    @Override public void onCheckFailed(String error) {
+                        Log.d(TAG, "Periodic update check skipped: " + error);
+                    }
+                }));
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopPeriodicUpdateCheck();
 
         // Clean up resources
         if (executor != null && !executor.isShutdown()) {
@@ -677,8 +725,16 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        stopPeriodicUpdateCheck();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        startPeriodicUpdateCheck();
+
         // Refresh language selection
         if (languageSpinner != null) {
             String currentLanguage = languagePrefs.getString(SELECTED_LANGUAGE, "en");

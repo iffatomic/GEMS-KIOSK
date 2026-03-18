@@ -288,6 +288,7 @@ public class FingerprintSyncService {
                             employee.getStaffID(),  // Username = StaffID
                             employee.getFullName(),
                             employee.getRole() != null ? employee.getRole() : "N/A",  // FIXED: Use role, not department!
+                            employee.isAllowedOverride(),
                             templateString,  // Pass template string DIRECTLY (no conversion needed!)
                             fp.getLeftRight(),
                             fp.getFingerIndex(),
@@ -460,6 +461,7 @@ public class FingerprintSyncService {
                             employee.getStaffID(),  // Username = StaffID
                             employee.getFullName(),
                             employee.getRole() != null ? employee.getRole() : "N/A",  // FIXED: Use role, not department!
+                            employee.isAllowedOverride(),
                             templateString,  // Pass template string DIRECTLY (no conversion needed!)
                             fp.getLeftRight(),
                             fp.getFingerIndex(),
@@ -859,6 +861,7 @@ public class FingerprintSyncService {
                         employee.getStaffID(),  // Username = StaffID
                         employee.getFullName(),
                         employee.getRole() != null ? employee.getRole() : "N/A",  // FIXED: Use role, not department!
+                        employee.isAllowedOverride(),
                         templateString,  // Pass template string DIRECTLY (no conversion needed!)
                         fp.getLeftRight(),
                         fp.getFingerIndex(),
