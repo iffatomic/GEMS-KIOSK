@@ -161,6 +161,14 @@ public class SignalRService {
             }
         }, com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto.class);
 
+        // ========== Listen for Kiosk Patch Ready (server-pushed APK update) ==========
+        hubConnection.on(ApiConstants.SIGNALR_KIOSK_PATCH_READY, () -> {
+            Log.i(TAG, "Received KioskPatchReady — triggering update check");
+            if (eventListener != null) {
+                eventListener.onKioskPatchReady();
+            }
+        });
+
         // ========== Listen for Fingerprint Enrollment Completion ==========
         hubConnection.on(ApiConstants.SIGNALR_FINGERPRINT_ENROLLMENT, (event) -> {
             Log.d(TAG, "╔════════════════════════════════════════════════════════════");
@@ -395,6 +403,7 @@ public class SignalRService {
         void onKeySwitchAggregate(KeySwitchAggregateEventDto event);
         void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event);
         void onFingerprintEnrollmentCompleted(FingerprintEnrollmentEventDto event);  // NEW: Fingerprint enrollment trigger
+        void onKioskPatchReady();
         void onConnectionClosed();
     }
 

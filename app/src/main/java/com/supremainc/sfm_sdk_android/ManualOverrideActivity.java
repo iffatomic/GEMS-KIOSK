@@ -37,6 +37,7 @@ import com.supremainc.sfm_sdk_android.network.callbacks.ManualOverrideCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
 import com.supremainc.sfm_sdk_android.service.ManualOverrideService;
 import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
+import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
 import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
 
@@ -226,6 +227,24 @@ public class ManualOverrideActivity extends AppCompatActivity {
             @Override public void onVaultIncidentBroadcast(com.supremainc.sfm_sdk_android.dto.signalr.VaultIncidentBroadcastDto incident) {}
             @Override public void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event) {}
             @Override public void onFingerprintEnrollmentCompleted(com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto event) {}
+            @Override public void onKioskPatchReady() {
+                Log.i(TAG, "KioskPatchReady received — checking for APK update");
+                new Thread(() -> AppUpdateManager.checkForUpdate(ManualOverrideActivity.this,
+                        new AppUpdateManager.UpdateCheckCallback() {
+                            @Override
+                            public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
+                                mainHandler.post(() -> {
+                                    if (!isDestroyed() && !isFinishing()) {
+                                        AppUpdateManager.showUpdateDialog(ManualOverrideActivity.this, versionInfo, apkFile, null);
+                                    }
+                                });
+                            }
+                            @Override public void onNoUpdateNeeded() {}
+                            @Override public void onCheckFailed(String error) {
+                                Log.w(TAG, "KioskPatchReady update check failed: " + error);
+                            }
+                        })).start();
+            }
             @Override public void onConnectionClosed() {
                 runOnUiThread(() -> {
                     signalRConnected = false;
@@ -899,11 +918,43 @@ public class ManualOverrideActivity extends AppCompatActivity {
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault());
                 tvStartTime.setText(sdf.format(new java.util.Date()));
 
-                // Populate the duration selector (rebuilds RadioButtons each time)
-                populateConfigurationSelector();
+                // Re-fetch configuration from server so any server-side updates are
+                // applied without needing to return to the main menu.
+                manualOverrideService.getOverrideConfiguration(new ApiCallback<List<ManualOverrideConfigurationResponse>>() {
+                    @Override
+                    public void onSuccess(List<ManualOverrideConfigurationResponse> configs) {
+                        if (configs != null && !configs.isEmpty()) {
+                            overrideConfigurations = configs;
+                            // Re-apply default selection
+                            selectedConfiguration = null;
+                            for (ManualOverrideConfigurationResponse c : configs) {
+                                if (c.isDefault()) {
+                                    selectedConfiguration = c;
+                                    maxOverrideDurationDays = c.getMaxOverrideDurationDays();
+                                    break;
+                                }
+                            }
+                            if (selectedConfiguration == null) {
+                                selectedConfiguration = configs.get(0);
+                                maxOverrideDurationDays = selectedConfiguration.getMaxOverrideDurationDays();
+                            }
+                            Log.d(TAG, "Step 4: refreshed config, maxDays=" + maxOverrideDurationDays);
+                        }
+                        runOnUiThread(() -> {
+                            populateConfigurationSelector();
+                            tvEndTimeLabel.setText("End Time (Max " + maxOverrideDurationDays + " day(s)):");
+                        });
+                    }
 
-                // Update end time label with current max duration
-                tvEndTimeLabel.setText("End Time (Max " + maxOverrideDurationDays + " day(s)):");
+                    @Override
+                    public void onError(String error) {
+                        Log.w(TAG, "Step 4: failed to refresh config, using cached values: " + error);
+                        runOnUiThread(() -> {
+                            populateConfigurationSelector();
+                            tvEndTimeLabel.setText("End Time (Max " + maxOverrideDurationDays + " day(s)):");
+                        });
+                    }
+                });
 
                 // Reset end time selection
                 selectedEndTimeMillis = 0;

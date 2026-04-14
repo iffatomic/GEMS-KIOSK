@@ -9,8 +9,8 @@ android {
         applicationId "com.banknegaramalaysia.gems"
         minSdkVersion 21
         targetSdkVersion 35  // ← KEPT AT 30: Avoids PendingIntent FLAG_IMMUTABLE requirement
-        versionCode 9
-        versionName "1.0.9"
+        versionCode 11
+        versionName "1.1.1"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
@@ -26,6 +26,24 @@ android {
     }
     namespace 'com.supremainc.sfm_sdk_android'
 }
+android.applicationVariants.all { variant ->
+    variant.assembleProvider.get().doLast {
+        def apkDir = variant.packageApplicationProvider.get().outputDirectory.get().asFile
+        def versionCode = android.defaultConfig.versionCode
+        def versionName = android.defaultConfig.versionName
+        def apkFileName = "gems-kiosk.apk"
+        def json = """{
+  "versionCode": ${versionCode},
+  "versionName": "${versionName}",
+  "apkFileName": "${apkFileName}",
+  "releaseNotes": "",
+  "forceUpdate": false
+}"""
+        new File(apkDir, "version.json").text = json
+        println ">>> Generated version.json: versionCode=${versionCode}, versionName=${versionName}"
+    }
+}
+
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'androidx.appcompat:appcompat:1.7.1'

@@ -329,6 +329,9 @@ public class FingerprintAutoSyncService extends Service {
         public void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event) {}
 
         @Override
+        public void onKioskPatchReady() {}
+
+        @Override
         public void onConnectionClosed() {
             Log.w(TAG, "SignalR connection closed - Auto-sync disabled until reconnection");
 

@@ -1,7 +1,8 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.9",
+  "versionCode": 11,
+  "versionName": "1.1.1",
   "apkFileName": "gems-kiosk.apk",
-  "releaseNotes": "test update",
+  "releaseNotes": "Updated kioskpatchready via signalr where kiosk receives signal then install",
   "forceUpdate": false
 }
+

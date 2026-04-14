@@ -453,6 +453,9 @@ public class VaultIncidentLogServiceUsageExample {
             }
 
             @Override
+            public void onKioskPatchReady() {}
+
+            @Override
             public void onConnectionClosed() {
                 Log.w(TAG, "SignalR connection closed");
                 showToast("Real-time monitoring disconnected");
@@ -591,6 +594,9 @@ public class VaultIncidentLogServiceUsageExample {
                 public void onFingerprintEnrollmentCompleted(FingerprintEnrollmentEventDto event) {
                     // Handle fingerprint enrollment events
                 }
+
+                @Override
+                public void onKioskPatchReady() {}
 
                 @Override
                 public void onConnectionClosed() {

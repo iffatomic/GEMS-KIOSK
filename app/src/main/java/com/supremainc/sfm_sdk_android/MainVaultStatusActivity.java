@@ -34,9 +34,11 @@ import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileL
 import com.supremainc.sfm_sdk_android.data.model.response.ManualOverrideProfileResponse;
 import com.supremainc.sfm_sdk_android.data.model.response.VaultInfo;
 import com.supremainc.sfm_sdk_android.network.api.ControllerProfileApiClient;
+import com.supremainc.sfm_sdk_android.network.api.FingerprintDownloadApiClient;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.ManualOverrideCallback;
 import com.supremainc.sfm_sdk_android.service.ManualOverrideService;
+import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -80,6 +82,7 @@ public class MainVaultStatusActivity extends AppCompatActivity {
     // API services
     private ControllerProfileApiClient controllerProfileApiClient;
     private ManualOverrideService manualOverrideService;
+    private FingerprintDownloadApiClient fingerprintDownloadApiClient;
 
     // Cache of controller profiles for this vault
     private List<ControllerProfileResponse> vaultProfiles = new ArrayList<>();
@@ -156,6 +159,7 @@ public class MainVaultStatusActivity extends AppCompatActivity {
         mainHandler = new Handler(Looper.getMainLooper());
         controllerProfileApiClient = new ControllerProfileApiClient(this);
         manualOverrideService = new ManualOverrideService(this);
+        fingerprintDownloadApiClient = new FingerprintDownloadApiClient(this);
 
         initializeSDK();
         initializeSignalR();
@@ -250,6 +254,26 @@ public class MainVaultStatusActivity extends AppCompatActivity {
             @Override
             public void onFingerprintEnrollmentCompleted(com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto event) {
                 // Not used in this activity
+            }
+
+            @Override
+            public void onKioskPatchReady() {
+                Log.i(TAG, "KioskPatchReady received — checking for APK update");
+                new Thread(() -> AppUpdateManager.checkForUpdate(MainVaultStatusActivity.this,
+                        new AppUpdateManager.UpdateCheckCallback() {
+                            @Override
+                            public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
+                                mainHandler.post(() -> {
+                                    if (!isDestroyed() && !isFinishing()) {
+                                        AppUpdateManager.showUpdateDialog(MainVaultStatusActivity.this, versionInfo, apkFile, null);
+                                    }
+                                });
+                            }
+                            @Override public void onNoUpdateNeeded() {}
+                            @Override public void onCheckFailed(String error) {
+                                Log.w(TAG, "KioskPatchReady update check failed: " + error);
+                            }
+                        })).start();
             }
 
             @Override
@@ -951,150 +975,74 @@ public class MainVaultStatusActivity extends AppCompatActivity {
                         isScanning = false;
 
                         if (finalUserName != null) {
-                            // ROLE AUTHORIZATION CHECK
+                            // isAllowedOverride AUTHORIZATION CHECK
                             Log.d(TAG, "╔═══════════════════════════════════════════");
                             Log.d(TAG, "║ DEACTIVATION AUTHORIZATION CHECK");
                             Log.d(TAG, "╠═══════════════════════════════════════════");
                             Log.d(TAG, "║ Employee: " + finalUserName);
                             Log.d(TAG, "║ Staff ID: " + finalUserStaffId);
-                            if (finalUserRole != null) {
-                                Log.d(TAG, "║ Role: '" + finalUserRole + "'");
-                                Log.d(TAG, "║ User Source: Synced (from API)");
-                            } else {
-                                Log.d(TAG, "║ Role: N/A");
-                                Log.d(TAG, "║ User Source: Local enrollment");
-                            }
+                            Log.d(TAG, "║ Role: " + (finalUserRole != null ? "'" + finalUserRole + "'" : "N/A (local)"));
+                            Log.d(TAG, "║ Checking isAllowedOverride via live API...");
 
-                            // REJECT CUSTODIAN ROLE
-                            if (finalUserRole != null && "CUSTODIAN".equalsIgnoreCase(finalUserRole)) {
-                                Log.w(TAG, "║ Authorization: ✗ DENIED (Custodian role)");
+                            if (finalUserStaffId == null) {
+                                Log.w(TAG, "║ Authorization: ✗ DENIED (cannot determine staff ID)");
                                 Log.d(TAG, "╚═══════════════════════════════════════════");
-
-                                instructionText.setText("❌ Authorization Failed\n\nCustodian role is not authorized to deactivate overrides.\n\nOnly Admin and other authorized roles can deactivate.");
+                                instructionText.setText("❌ Authorization Failed\n\nCould not verify employee identity.");
                                 instructionText.setTextColor(getResources().getColor(android.R.color.holo_red_light));
-                                Toast.makeText(MainVaultStatusActivity.this,
-                                    "Access Denied: Custodian role cannot deactivate overrides",
-                                    Toast.LENGTH_LONG).show();
-                                return; // Exit - do not allow deactivation
+                                return;
                             }
 
-                            // AUTHORIZED - Show confirmation dialog before deactivating
-                            Log.i(TAG, "║ Authorization: ✓ GRANTED");
-                            if (finalUserRole != null) {
-                                Log.i(TAG, "║ Authorized role: " + finalUserRole);
-                            } else {
-                                Log.i(TAG, "║ Local user - allowed by default");
-                            }
-                            Log.d(TAG, "╚═══════════════════════════════════════════");
+                            instructionText.setText("Fingerprint matched. Checking permissions...");
+                            instructionText.setTextColor(getResources().getColor(android.R.color.white));
 
-                            // Hide fingerprint dialog and show confirmation dialog
-                            dialog.dismiss();
+                            fingerprintDownloadApiClient.getAllEmployeesWithFingerprints(
+                                new ApiCallback<com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse>() {
+                                    @Override
+                                    public void onSuccess(com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse response) {
+                                        com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse.EmployeeFingerprintData freshEmployee = null;
+                                        if (response.getEmployees() != null) {
+                                            for (com.supremainc.sfm_sdk_android.data.model.response.AllEmployeesFingerprintsResponse.EmployeeFingerprintData e : response.getEmployees()) {
+                                                if (finalUserStaffId.equalsIgnoreCase(e.getStaffID())) {
+                                                    freshEmployee = e;
+                                                    break;
+                                                }
+                                            }
+                                        }
 
-                            // Build confirmation message
-                            String roleDisplay = finalUserRole != null ? finalUserRole :
-                                                (finalIsAdmin ? "Admin" : "User");
+                                        if (freshEmployee == null) {
+                                            Log.w(TAG, "Employee not found in fresh API response: " + finalUserStaffId);
+                                            runOnUiThread(() -> {
+                                                instructionText.setText("❌ Employee not found in server data.\nPlease contact administrator.");
+                                                instructionText.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+                                            });
+                                            return;
+                                        }
 
-                            String confirmMessage = "Verified employee:\n\n" +
-                                                  "Name: " + finalUserName + "\n" +
-                                                  "Staff ID: " + finalUserStaffId + "\n" +
-                                                  "Role: " + roleDisplay + "\n\n" +
-                                                  "Door: " + displayName + "\n\n" +
-                                                  "Proceed with deactivation?";
+                                        final boolean liveAllowed = freshEmployee.isAllowedOverride();
+                                        Log.d(TAG, "Live override check for " + finalUserStaffId + ": isAllowedOverride=" + liveAllowed);
+                                        dbHelper.updateIsAllowedOverrideByEmployeeNumber(finalUserStaffId, liveAllowed);
 
-                            new AlertDialog.Builder(MainVaultStatusActivity.this)
-                                .setTitle("Confirm Deactivation")
-                                .setMessage(confirmMessage)
-                                .setPositiveButton("Deactivate", (confirmDialog, which) -> {
-                                    // User confirmed - proceed with deactivation
-                                    String profileId = override.getProfileId();
-                                    Log.d(TAG, "╔═══════════════════════════════════════════");
-                                    Log.d(TAG, "║ USER CONFIRMED - PROCEEDING WITH DEACTIVATION");
-                                    Log.d(TAG, "╠═══════════════════════════════════════════");
-                                    Log.d(TAG, "║ Profile ID: " + profileId);
-                                    Log.d(TAG, "║ Door: " + displayName);
-                                    Log.d(TAG, "║ Deactivated by: " + finalUserName + " (" + finalUserStaffId + ")");
-                                    if (finalUserRole != null) {
-                                        Log.d(TAG, "║ Role: " + finalUserRole);
-                                    } else {
-                                        Log.d(TAG, "║ User type: " + (finalIsAdmin ? "Admin" : "User"));
+                                        runOnUiThread(() -> proceedWithDeactivationIfAllowed(
+                                            liveAllowed, finalUserName, finalUserStaffId, finalUserRole, finalIsAdmin,
+                                            displayName, override, dialog, instructionText, "live API"));
                                     }
 
-                                    // Must have a profile ID to deactivate via API
-                                    if (profileId != null && !profileId.isEmpty()) {
-                                        Log.d(TAG, "║ Calling PAC API...");
-                                        Log.d(TAG, "╚═══════════════════════════════════════════");
-
-                                        // Show progress dialog
-                                        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(MainVaultStatusActivity.this);
-                                        progressDialog.setMessage("Deactivating override...");
-                                        progressDialog.setCancelable(false);
-                                        progressDialog.show();
-
-                                        manualOverrideService.deactivateProfile(profileId, new ManualOverrideCallback() {
-                                        @Override
-                                        public void onProfileCreated(ManualOverrideProfileResponse response) {
-                                            // Not used
-                                            Log.w(TAG, "onProfileCreated called during deactivation - unexpected");
+                                    @Override
+                                    public void onError(String error) {
+                                        Log.w(TAG, "Live override check failed, falling back to cached DB value: " + error);
+                                        // Cached fallback: read isAllowedOverride from local DB
+                                        boolean cachedAllowed = false;
+                                        if (scannedScannerID >= 10000) {
+                                            DatabaseHelper.SyncedFingerprint sf = dbHelper.getUserByScannerId(scannedScannerID);
+                                            if (sf != null) cachedAllowed = sf.isAllowedOverride();
                                         }
-
-                                        @Override
-                                        public void onProfileDeactivated(ManualOverrideProfileResponse response) {
-                                            Log.i(TAG, "╔═══════════════════════════════════════════");
-                                            Log.i(TAG, "║ ✓ PAC API DEACTIVATION SUCCESS");
-                                            Log.i(TAG, "╠═══════════════════════════════════════════");
-                                            Log.i(TAG, "║ Profile ID: " + response.getProfileId());
-                                            Log.i(TAG, "║ Status: " + response.getStatus());
-                                            Log.i(TAG, "║ Deactivated by: " + finalUserName + " (" + finalUserStaffId + ")");
-                                            if (finalUserRole != null) {
-                                                Log.i(TAG, "║ Role: " + finalUserRole);
-                                            }
-                                            Log.i(TAG, "╚═══════════════════════════════════════════");
-
-                                            runOnUiThread(() -> {
-                                                progressDialog.dismiss();
-
-                                                // Show success message
-                                                String roleDisplay = finalUserRole != null ? " (" + finalUserRole + ")" :
-                                                                    (finalIsAdmin ? " (Admin)" : " (User)");
-                                                Toast.makeText(MainVaultStatusActivity.this,
-                                                    "✓ Override deactivated successfully by:\n" + finalUserName + roleDisplay,
-                                                    Toast.LENGTH_LONG).show();
-
-                                                // Reload vault status from API
-                                                loadDoorsFromApi();
-                                            });
-                                        }
-
-                                        @Override
-                                        public void onProfileError(String error) {
-                                            Log.e(TAG, "╔═══════════════════════════════════════════");
-                                            Log.e(TAG, "║ ✗ PAC API DEACTIVATION FAILED");
-                                            Log.e(TAG, "╠═══════════════════════════════════════════");
-                                            Log.e(TAG, "║ Error: " + error);
-                                            Log.e(TAG, "║ Profile ID attempted: " + profileId);
-                                            Log.e(TAG, "╚═══════════════════════════════════════════");
-
-                                            // Show failure based on API response
-                                            runOnUiThread(() -> {
-                                                progressDialog.dismiss();
-                                                Toast.makeText(MainVaultStatusActivity.this,
-                                                    "Failed to deactivate: " + error,
-                                                    Toast.LENGTH_LONG).show();
-                                            });
-                                        }
-                                    });
-                                } else {
-                                    Log.e(TAG, "║ ERROR: No profile ID found - cannot deactivate!");
-                                    Log.d(TAG, "╚═══════════════════════════════════════════");
-                                    Toast.makeText(MainVaultStatusActivity.this,
-                                        "Cannot deactivate: No profile ID",
-                                        Toast.LENGTH_LONG).show();
+                                        final boolean allowed = cachedAllowed;
+                                        runOnUiThread(() -> proceedWithDeactivationIfAllowed(
+                                            allowed, finalUserName, finalUserStaffId, finalUserRole, finalIsAdmin,
+                                            displayName, override, dialog, instructionText, "cached DB"));
+                                    }
                                 }
-                            })
-                            .setNegativeButton("Cancel", (confirmDialog, which) -> {
-                                Log.d(TAG, "User cancelled deactivation after fingerprint verification");
-                            })
-                            .show();
+                            );
                         } else {
                             instructionText.setText("Fingerprint not recognized.\nPlease try again.");
                             instructionText.setTextColor(getResources().getColor(android.R.color.holo_red_light));
@@ -1118,6 +1066,125 @@ public class MainVaultStatusActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    /**
+     * Called after isAllowedOverride check (live or cached). Shows a confirmation dialog
+     * and proceeds with deactivation if the employee is authorised.
+     */
+    private void proceedWithDeactivationIfAllowed(
+            boolean allowed,
+            String userName,
+            String userStaffId,
+            String userRole,
+            boolean isAdmin,
+            String displayName,
+            ManualOverrideProfileResponse override,
+            android.app.Dialog fingerprintDialog,
+            TextView instructionText,
+            String checkSource) {
+
+        if (!allowed) {
+            Log.w(TAG, "║ Authorization: ✗ DENIED (isAllowedOverride=false, source=" + checkSource + ")");
+            Log.d(TAG, "╚═══════════════════════════════════════════");
+            instructionText.setText("❌ Override Not Permitted\n\nYour account is not authorised to deactivate manual vault override.");
+            instructionText.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+            Toast.makeText(this, "Access Denied: You are not authorised to deactivate override", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Log.i(TAG, "║ Authorization: ✓ GRANTED (isAllowedOverride=true, source=" + checkSource + ")");
+        Log.d(TAG, "╚═══════════════════════════════════════════");
+
+        fingerprintDialog.dismiss();
+
+        String roleDisplay = userRole != null ? userRole : (isAdmin ? "Admin" : "User");
+        String confirmMessage = "Verified employee:\n\n" +
+                                "Name: " + userName + "\n" +
+                                "Staff ID: " + userStaffId + "\n" +
+                                "Role: " + roleDisplay + "\n\n" +
+                                "Door: " + displayName + "\n\n" +
+                                "Proceed with deactivation?";
+
+        new AlertDialog.Builder(this)
+            .setTitle("Confirm Deactivation")
+            .setMessage(confirmMessage)
+            .setPositiveButton("Deactivate", (confirmDialog, which) -> {
+                String profileId = override.getProfileId();
+                Log.d(TAG, "╔═══════════════════════════════════════════");
+                Log.d(TAG, "║ USER CONFIRMED - PROCEEDING WITH DEACTIVATION");
+                Log.d(TAG, "╠═══════════════════════════════════════════");
+                Log.d(TAG, "║ Profile ID: " + profileId);
+                Log.d(TAG, "║ Door: " + displayName);
+                Log.d(TAG, "║ Deactivated by: " + userName + " (" + userStaffId + ")");
+                if (userRole != null) {
+                    Log.d(TAG, "║ Role: " + userRole);
+                } else {
+                    Log.d(TAG, "║ User type: " + (isAdmin ? "Admin" : "User"));
+                }
+
+                if (profileId != null && !profileId.isEmpty()) {
+                    Log.d(TAG, "║ Calling PAC API...");
+                    Log.d(TAG, "╚═══════════════════════════════════════════");
+
+                    android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+                    progressDialog.setMessage("Deactivating override...");
+                    progressDialog.setCancelable(false);
+                    progressDialog.show();
+
+                    manualOverrideService.deactivateProfile(profileId, new ManualOverrideCallback() {
+                        @Override
+                        public void onProfileCreated(ManualOverrideProfileResponse response) {
+                            Log.w(TAG, "onProfileCreated called during deactivation - unexpected");
+                        }
+
+                        @Override
+                        public void onProfileDeactivated(ManualOverrideProfileResponse response) {
+                            Log.i(TAG, "╔═══════════════════════════════════════════");
+                            Log.i(TAG, "║ ✓ PAC API DEACTIVATION SUCCESS");
+                            Log.i(TAG, "╠═══════════════════════════════════════════");
+                            Log.i(TAG, "║ Profile ID: " + response.getProfileId());
+                            Log.i(TAG, "║ Status: " + response.getStatus());
+                            Log.i(TAG, "║ Deactivated by: " + userName + " (" + userStaffId + ")");
+                            if (userRole != null) Log.i(TAG, "║ Role: " + userRole);
+                            Log.i(TAG, "╚═══════════════════════════════════════════");
+
+                            runOnUiThread(() -> {
+                                progressDialog.dismiss();
+                                String rd = userRole != null ? " (" + userRole + ")" : (isAdmin ? " (Admin)" : " (User)");
+                                Toast.makeText(MainVaultStatusActivity.this,
+                                    "✓ Override deactivated successfully by:\n" + userName + rd,
+                                    Toast.LENGTH_LONG).show();
+                                loadDoorsFromApi();
+                            });
+                        }
+
+                        @Override
+                        public void onProfileError(String error) {
+                            Log.e(TAG, "╔═══════════════════════════════════════════");
+                            Log.e(TAG, "║ ✗ PAC API DEACTIVATION FAILED");
+                            Log.e(TAG, "╠═══════════════════════════════════════════");
+                            Log.e(TAG, "║ Error: " + error);
+                            Log.e(TAG, "║ Profile ID attempted: " + profileId);
+                            Log.e(TAG, "╚═══════════════════════════════════════════");
+
+                            runOnUiThread(() -> {
+                                progressDialog.dismiss();
+                                Toast.makeText(MainVaultStatusActivity.this,
+                                    "Failed to deactivate: " + error,
+                                    Toast.LENGTH_LONG).show();
+                            });
+                        }
+                    });
+                } else {
+                    Log.e(TAG, "║ ERROR: No profile ID found - cannot deactivate!");
+                    Log.d(TAG, "╚═══════════════════════════════════════════");
+                    Toast.makeText(this, "Cannot deactivate: No profile ID", Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("Cancel", (confirmDialog, which) ->
+                Log.d(TAG, "User cancelled deactivation after fingerprint verification"))
+            .show();
     }
 
     /**
