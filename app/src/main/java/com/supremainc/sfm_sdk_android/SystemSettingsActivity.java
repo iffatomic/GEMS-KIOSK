@@ -56,6 +56,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
     private android.widget.Button btnSaveAndRestart;
     private android.widget.EditText editUpdateCheckInterval;
     private LinearLayout checkUpdatesCard;
+    private android.widget.TextView tvAppVersion;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,6 +143,17 @@ public class SystemSettingsActivity extends AppCompatActivity {
         // Inactivity timeout
         seekbarInactivityTimeout = findViewById(R.id.seekbar_inactivity_timeout);
         textInactivityTimeoutValue = findViewById(R.id.text_inactivity_timeout_value);
+
+        // App version
+        tvAppVersion = findViewById(R.id.tv_app_version);
+        if (tvAppVersion != null) {
+            try {
+                android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+                tvAppVersion.setText("GEMS Kiosk v" + info.versionName + " (" + info.versionCode + ")");
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                tvAppVersion.setText("GEMS Kiosk");
+            }
+        }
         if (seekbarInactivityTimeout != null) {
             seekbarInactivityTimeout.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
                 @Override

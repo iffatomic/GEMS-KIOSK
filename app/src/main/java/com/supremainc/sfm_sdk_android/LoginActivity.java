@@ -60,6 +60,7 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private Spinner languageSpinner;
     private android.widget.ImageView appLogo;
+    private android.widget.ImageButton btnSystemSettingsIcon;
 
     // Double-tap tracking for logo
     private long lastLogoTapTime = 0;
@@ -166,6 +167,7 @@ public class LoginActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         languageSpinner = findViewById(R.id.language_spinner);
         appLogo = findViewById(R.id.app_logo);
+        btnSystemSettingsIcon = findViewById(R.id.btn_system_settings_icon);
 
         // Initially hide progress bar
         progressBar.setVisibility(View.GONE);
@@ -335,6 +337,13 @@ public class LoginActivity extends AppCompatActivity {
             }
             lastLogoTapTime = currentTime;
         });
+
+        if (btnSystemSettingsIcon != null) {
+            btnSystemSettingsIcon.setOnClickListener(v -> {
+                Intent intent = new Intent(LoginActivity.this, SystemSettingsActivity.class);
+                startActivity(intent);
+            });
+        }
     }
 
     private void performLogin() {

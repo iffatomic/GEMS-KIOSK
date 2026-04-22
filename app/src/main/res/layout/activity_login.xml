@@ -97,13 +97,13 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/GEMS_fullname"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/textPrimary"
                     android:layout_gravity="center"
+                    android:layout_marginBottom="8dp"
                     android:gravity="center"
-                    android:layout_marginBottom="8dp" />
+                    android:text="@string/GEMS_fullname"
+                    android:textColor="@color/background_primary"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
 
                 <!-- Login Subtitle -->
                 <TextView
@@ -252,5 +252,19 @@
         </LinearLayout>
 
     </ScrollView>
+
+    <!-- Settings icon in top-right — declared after ScrollView so it sits on top and receives touches -->
+    <ImageButton
+        android:id="@+id/btn_system_settings_icon"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="System Settings"
+        android:padding="10dp"
+        android:src="@drawable/outline_settings_24"
+        android:tint="@color/white" />
 
 </RelativeLayout>

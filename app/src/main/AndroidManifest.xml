@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -21,6 +23,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:testOnly="false"
         android:theme="@style/AppTheme">
         <activity
             android:name=".DayVaultStatusActivity"
@@ -81,6 +84,13 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Persistent service: listens for KioskPatchReady SignalR event and silently installs APK updates -->
+        <service
+            android:name=".service.KioskUpdateService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- Key switch monitoring service for manual override profiles -->
         <service
             android:name=".service.KeySwitchMonitoringService"
@@ -109,6 +119,34 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
+
+        <!-- Device Owner receiver — required for silent APK installs via PackageInstaller -->
+        <receiver
+            android:name=".receiver.GEMSDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receives PackageInstaller session results for silent installs -->
+        <receiver
+            android:name=".receiver.InstallResultReceiver"
+            android:exported="false" />
+
+        <!-- Relaunches the app after a silent self-update completes -->
+        <receiver
+            android:name=".receiver.PackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

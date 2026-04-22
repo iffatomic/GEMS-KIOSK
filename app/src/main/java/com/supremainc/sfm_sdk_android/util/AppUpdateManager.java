@@ -6,8 +6,11 @@
 package com.supremainc.sfm_sdk_android.util;
 
 import android.app.AlertDialog;
+import android.app.PendingIntent;
+import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -20,7 +23,12 @@ import androidx.core.content.FileProvider;
 
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
+import com.supremainc.sfm_sdk_android.receiver.InstallResultReceiver;
 import com.supremainc.sfm_sdk_android.util.ConfigManager;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -215,6 +223,62 @@ public class AppUpdateManager {
         }
 
         builder.show();
+    }
+
+    /**
+     * Returns true if this app is the Device Owner, which allows silent APK installs.
+     */
+    public static boolean isDeviceOwner(Context context) {
+        DevicePolicyManager dpm =
+                (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+        return dpm != null && dpm.isDeviceOwnerApp(context.getPackageName());
+    }
+
+    /**
+     * Installs the APK silently via PackageInstaller session (Device Owner path).
+     * If the device is not Device Owner, Android will fire STATUS_PENDING_USER_ACTION
+     * and InstallResultReceiver will fall back to the system installer UI.
+     *
+     * Must be called from a background thread — do NOT call on the main thread.
+     */
+    public static void silentInstall(Context context, File apkFile) {
+        PackageInstaller packageInstaller =
+                context.getPackageManager().getPackageInstaller();
+
+        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        params.setAppPackageName(context.getPackageName());
+
+        try {
+            int sessionId = packageInstaller.createSession(params);
+            PackageInstaller.Session session = packageInstaller.openSession(sessionId);
+
+            try (InputStream in = new FileInputStream(apkFile);
+                 OutputStream out = session.openWrite("package", 0, apkFile.length())) {
+                byte[] buffer = new byte[65536];
+                int len;
+                while ((len = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, len);
+                }
+                session.fsync(out);
+            }
+
+            Intent intent = new Intent(context, InstallResultReceiver.class);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                    context, sessionId, intent, flags);
+
+            session.commit(pendingIntent.getIntentSender());
+            session.close();
+
+            Log.i(TAG, "Silent install committed: " + apkFile.getName());
+
+        } catch (Exception e) {
+            Log.e(TAG, "Silent install failed", e);
+        }
     }
 
     private static void installApk(Context context, File apkFile) {

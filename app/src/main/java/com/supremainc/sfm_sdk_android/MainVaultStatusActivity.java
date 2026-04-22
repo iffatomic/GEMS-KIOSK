@@ -38,7 +38,6 @@ import com.supremainc.sfm_sdk_android.network.api.FingerprintDownloadApiClient;
 import com.supremainc.sfm_sdk_android.network.callbacks.ApiCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.ManualOverrideCallback;
 import com.supremainc.sfm_sdk_android.service.ManualOverrideService;
-import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -258,22 +257,7 @@ public class MainVaultStatusActivity extends AppCompatActivity {
 
             @Override
             public void onKioskPatchReady() {
-                Log.i(TAG, "KioskPatchReady received — checking for APK update");
-                new Thread(() -> AppUpdateManager.checkForUpdate(MainVaultStatusActivity.this,
-                        new AppUpdateManager.UpdateCheckCallback() {
-                            @Override
-                            public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
-                                mainHandler.post(() -> {
-                                    if (!isDestroyed() && !isFinishing()) {
-                                        AppUpdateManager.showUpdateDialog(MainVaultStatusActivity.this, versionInfo, apkFile, null);
-                                    }
-                                });
-                            }
-                            @Override public void onNoUpdateNeeded() {}
-                            @Override public void onCheckFailed(String error) {
-                                Log.w(TAG, "KioskPatchReady update check failed: " + error);
-                            }
-                        })).start();
+                // Handled by KioskUpdateService
             }
 
             @Override

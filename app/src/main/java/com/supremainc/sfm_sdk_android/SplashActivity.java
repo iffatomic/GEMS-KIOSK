@@ -21,6 +21,7 @@ import com.supremainc.sfm_sdk_android.data.model.response.UserListItem;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
 import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
 import com.supremainc.sfm_sdk_android.service.FingerprintAutoSyncService;
+import com.supremainc.sfm_sdk_android.service.KioskUpdateService;
 import com.supremainc.sfm_sdk_android.util.ApiConstants;
 import com.supremainc.sfm_sdk_android.util.ConfigManager;
 import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
@@ -64,6 +65,10 @@ public class SplashActivity extends AppCompatActivity {
         // throughout the entire app session, regardless of which screen user is on
         Intent fingerprintSyncIntent = new Intent(this, FingerprintAutoSyncService.class);
         startService(fingerprintSyncIntent);
+
+        // Start kiosk update service — listens for KioskPatchReady SignalR event universally
+        Intent kioskUpdateIntent = new Intent(this, KioskUpdateService.class);
+        androidx.core.content.ContextCompat.startForegroundService(this, kioskUpdateIntent);
         Log.d(TAG, "╔════════════════════════════════════════════════════════════");
         Log.d(TAG, "║ Fingerprint Auto-Sync Service started (from Splash)");
         Log.d(TAG, "║ SignalR will remain active across all activities");

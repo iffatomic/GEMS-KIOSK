@@ -37,7 +37,6 @@ import com.supremainc.sfm_sdk_android.network.callbacks.ManualOverrideCallback;
 import com.supremainc.sfm_sdk_android.network.callbacks.StaffEnrollmentCallback;
 import com.supremainc.sfm_sdk_android.service.ManualOverrideService;
 import com.supremainc.sfm_sdk_android.service.StaffEnrollmentService;
-import com.supremainc.sfm_sdk_android.util.AppUpdateManager;
 import com.supremainc.sfm_sdk.SFM_SDK_ANDROID;
 import com.supremainc.sfm_sdk.enumeration.UF_RET_CODE;
 
@@ -228,22 +227,7 @@ public class ManualOverrideActivity extends AppCompatActivity {
             @Override public void onInterimCutoffReached(com.supremainc.sfm_sdk_android.dto.signalr.InterimCutoffEventDto event) {}
             @Override public void onFingerprintEnrollmentCompleted(com.supremainc.sfm_sdk_android.dto.signalr.FingerprintEnrollmentEventDto event) {}
             @Override public void onKioskPatchReady() {
-                Log.i(TAG, "KioskPatchReady received — checking for APK update");
-                new Thread(() -> AppUpdateManager.checkForUpdate(ManualOverrideActivity.this,
-                        new AppUpdateManager.UpdateCheckCallback() {
-                            @Override
-                            public void onUpdateAvailable(AppUpdateManager.VersionInfo versionInfo, java.io.File apkFile) {
-                                mainHandler.post(() -> {
-                                    if (!isDestroyed() && !isFinishing()) {
-                                        AppUpdateManager.showUpdateDialog(ManualOverrideActivity.this, versionInfo, apkFile, null);
-                                    }
-                                });
-                            }
-                            @Override public void onNoUpdateNeeded() {}
-                            @Override public void onCheckFailed(String error) {
-                                Log.w(TAG, "KioskPatchReady update check failed: " + error);
-                            }
-                        })).start();
+                // Handled by KioskUpdateService
             }
             @Override public void onConnectionClosed() {
                 runOnUiThread(() -> {

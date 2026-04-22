@@ -9,8 +9,8 @@ android {
         applicationId "com.banknegaramalaysia.gems"
         minSdkVersion 21
         targetSdkVersion 35  // ← KEPT AT 30: Avoids PendingIntent FLAG_IMMUTABLE requirement
-        versionCode 11
-        versionName "1.1.1"
+        versionCode 42
+        versionName "0.2.0421.5"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
