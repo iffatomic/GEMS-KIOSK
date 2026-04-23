@@ -270,22 +270,40 @@
                     android:textColor="@color/textSecondary"
                     android:layout_marginBottom="16dp" />
 
-                <SeekBar
-                    android:id="@+id/seekbar_inactivity_timeout"
+                <RadioGroup
+                    android:id="@+id/radiogroup_inactivity_timeout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="2"
-                    android:layout_marginBottom="8dp" />
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/text_inactivity_timeout_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="5 minutes"
-                    android:textSize="14sp"
-                    android:textColor="@color/textPrimary"
-                    android:textStyle="bold"
-                    android:layout_gravity="center_horizontal" />
+                    <RadioButton
+                        android:id="@+id/radio_3min"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="3 minutes"
+                        android:textColor="@color/textPrimary"
+                        android:gravity="center" />
+
+                    <RadioButton
+                        android:id="@+id/radio_4min"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="4 minutes"
+                        android:textColor="@color/textPrimary"
+                        android:gravity="center" />
+
+                    <RadioButton
+                        android:id="@+id/radio_5min"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="5 minutes"
+                        android:textColor="@color/textPrimary"
+                        android:gravity="center" />
+
+                </RadioGroup>
 
             </LinearLayout>
 

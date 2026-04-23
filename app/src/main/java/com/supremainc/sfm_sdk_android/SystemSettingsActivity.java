@@ -50,8 +50,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
     private android.widget.EditText editSignalRPath;
     private android.widget.EditText editConnectTimeout;
     private android.widget.EditText editReadTimeout;
-    private android.widget.SeekBar seekbarInactivityTimeout;
-    private android.widget.TextView textInactivityTimeoutValue;
+    private android.widget.RadioGroup radiogroupInactivityTimeout;
     private android.widget.Button btnSaveSettings;
     private android.widget.Button btnSaveAndRestart;
     private android.widget.EditText editUpdateCheckInterval;
@@ -141,8 +140,7 @@ public class SystemSettingsActivity extends AppCompatActivity {
         checkUpdatesCard = findViewById(R.id.check_updates_card);
 
         // Inactivity timeout
-        seekbarInactivityTimeout = findViewById(R.id.seekbar_inactivity_timeout);
-        textInactivityTimeoutValue = findViewById(R.id.text_inactivity_timeout_value);
+        radiogroupInactivityTimeout = findViewById(R.id.radiogroup_inactivity_timeout);
 
         // App version
         tvAppVersion = findViewById(R.id.tv_app_version);
@@ -154,20 +152,6 @@ public class SystemSettingsActivity extends AppCompatActivity {
                 tvAppVersion.setText("GEMS Kiosk");
             }
         }
-        if (seekbarInactivityTimeout != null) {
-            seekbarInactivityTimeout.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-                @Override
-                public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                    int minutes = progress + 3;
-                    if (textInactivityTimeoutValue != null) {
-                        textInactivityTimeoutValue.setText(minutes + " minutes");
-                    }
-                }
-                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
-                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
-            });
-        }
-
         // Load current config values into UI
         loadConfigValues();
     }
@@ -235,10 +219,14 @@ public class SystemSettingsActivity extends AppCompatActivity {
             editConnectTimeout.setText(String.valueOf(config.getConnectTimeoutMs()));
             editReadTimeout.setText(String.valueOf(config.getReadTimeoutMs()));
 
-            // Load inactivity timeout (3-5 minutes, seekbar 0-2)
+            // Load inactivity timeout (3-5 minutes)
             int timeoutMinutes = Math.max(3, Math.min(5, config.getInactivityTimeoutMinutes()));
-            if (seekbarInactivityTimeout != null) seekbarInactivityTimeout.setProgress(timeoutMinutes - 3);
-            if (textInactivityTimeoutValue != null) textInactivityTimeoutValue.setText(timeoutMinutes + " minutes");
+            if (radiogroupInactivityTimeout != null) {
+                int radioId = timeoutMinutes == 3 ? R.id.radio_3min
+                            : timeoutMinutes == 4 ? R.id.radio_4min
+                            : R.id.radio_5min;
+                radiogroupInactivityTimeout.check(radioId);
+            }
 
             // Load update check interval
             if (editUpdateCheckInterval != null) {
@@ -298,8 +286,10 @@ public class SystemSettingsActivity extends AppCompatActivity {
             config.setReadTimeoutMs(readTimeout);
 
             // Update inactivity timeout
-            if (seekbarInactivityTimeout != null) {
-                config.setInactivityTimeoutMinutes(seekbarInactivityTimeout.getProgress() + 3);
+            if (radiogroupInactivityTimeout != null) {
+                int checked = radiogroupInactivityTimeout.getCheckedRadioButtonId();
+                int minutes = checked == R.id.radio_3min ? 3 : checked == R.id.radio_4min ? 4 : 5;
+                config.setInactivityTimeoutMinutes(minutes);
             }
 
             // Update update check interval
@@ -387,8 +377,10 @@ public class SystemSettingsActivity extends AppCompatActivity {
             config.setReadTimeoutMs(readTimeout);
 
             // Update inactivity timeout
-            if (seekbarInactivityTimeout != null) {
-                config.setInactivityTimeoutMinutes(seekbarInactivityTimeout.getProgress() + 3);
+            if (radiogroupInactivityTimeout != null) {
+                int checked = radiogroupInactivityTimeout.getCheckedRadioButtonId();
+                int minutes = checked == R.id.radio_3min ? 3 : checked == R.id.radio_4min ? 4 : 5;
+                config.setInactivityTimeoutMinutes(minutes);
             }
 
             // Update update check interval
